@@ -1,0 +1,1322 @@
+# FMBN analyzer v1.1 -----------------------------------------------
+
+# performs graphical and numerical analysis of FMBN data generated with the
+# ShinyFMBN app
+
+# Preparatory steps -------------------------------------------------------
+
+# install/load packages -------------------------------------------------
+# need to use plyr:: because of conflicts
+# there are also other potential conflicts between vegan and bipartite
+.cran_packages <- c("plyr", "reshape2", "gplots", "tidyverse",
+                    "randomcoloR", "bipartite", "RColorBrewer",
+                    "ggrepel", "vegan")
+.inst <- .cran_packages %in% installed.packages()
+if(any(!.inst)) {
+  install.packages(.cran_packages[!.inst])
+}
+sapply(.cran_packages, require, 
+       character.only = TRUE)
+
+opar <- par(no.readonly = T)
+set.seed(1234)
+#########1#########2#########3#########4#########5#########6#########7#########8
+# list files in working directory for convenience only
+list.files()
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Load data ---------------------------------------------------------------
+# (generated with the ShinyFMBN app or with FMBNmakefilesv5_x )                #
+#########1#########2#########3#########4#########5#########6#########7#########8
+
+cat("Select input data in .rds format, filename ends with _agg.rds", "\n",
+    "\n", sep = "")
+input_file_name <- file.choose()
+file_name_prefix <- substr(input_file_name, 1, as.integer(gregexpr(pattern ='_agg.RDS', 
+                                                          input_file_name))-1)
+file_name <- basename(file_name_prefix)
+input_data <- readRDS(input_file_name)
+# list, containing the following
+#   studies the study table
+#   OTU_table the OTU table (taxa are columns) with absolute freqs
+#   OTU_table_relf OTU table (taxa are rows, a_label) with rel freqs
+#   sample_metadata the sample metadata
+#   taxa_metadata the taxa metadata
+#   edge_table basically, the OTU_table_relf in long format, with frequencies in %
+#   node_table info on sample and OTU nodes
+#   i_graph an igraph bipartite object
+#   references data frame containing the references
+#   version text decribing the FMBN version
+#   sample_agg the level of aggregation for samples
+#   tax_agg the level of aggregation for taxa
+
+# check if the data are in the right format
+check_names <- names(input_data) == c("studies","OTU_table", "OTU_table_relf", 
+                                      "sample_metadata", "taxa_metadata", 
+                                      "edge_table", "node_table", "i_graph", 
+                                      "references", "version", "sample_agg", 
+                                      "tax_agg")
+length(check_names) == sum(check_names)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Set options -------------------------------------------------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+
+# options for saving graphs
+savegraph <- T 
+# set savegraph to T if you want to save graphs (some graphs won't be displayed)
+# use F if you don't want to save
+graphresolution <- 300 # in dpi
+graphsizein <- 7 # size in inches, overridden in some graphs
+graphtype <- "tif" # alternative value is "pdf"
+
+# options for number of OTU groups in sample and OTU palettes
+overrides <- F # set to T if you want more than 15 categories in sample palettes
+overrideOTU <- F # set to T if you want more than 15 categories in OTU palettes
+
+# The "Other" column has no taxonomic meaning unless it is an aggregate of
+# several OTUs (see instructions in the FMBN_make_files* script) and will be
+# removed by default. The "Chloroplast" and "Mitochondria" columns only indicate  
+# contamination with chloroplast or mitochondria  DNA/RNA and should also be  
+# removed. Set to F if you want to keep these columns in OTU tables.
+removeOther <- T
+removeChloroplast <- T
+removeMitochondria <- T
+
+# options for filtering samples and OTUs
+# if filtersamples == T the sample filter will be applied (overridden if sample_agg == "exp. code")
+# if filterOTUs == T the maxrelab filter will be applied
+
+filtersamples <- T
+filterOTUs <- T
+# filter for OTU abundance. OTUs with a maximum relative abundance < abtreshold
+# will be removed or pooled (see below)
+# keep the value low or you will loose too many OTUs between filtering and
+# rarefaction
+abtreshold <- 0.005
+
+# options for taxa prevalence filter (only applicable when sample aggregation is sample)
+prev_filter <- F
+prev_treshold <- 0.05 # as fraction of samples
+prev_filter_flag <- F
+
+# flags for filtering, will be set to true if filtering is performed
+filtersamples_flag <- F
+filterOTU_flag <- F
+
+# samples/sample groups with less than minsampleab will be removed
+minsampleab <- 1000 
+
+# rarefy? if T vegan::rrarefy() will be used to extract a random rarefied
+# matrix. If raremin is T will rarefy to the closest hundred below the
+# minimum number of sequences, otherwise will rarefy to raren.
+# The default is F, although rarefaction will be performed for bipartite
+# analysis 
+rareoption <- F
+raremin <- T
+raren <- 1000
+rarefy_flag <- F # will be set to T if rarefaction is performed
+
+# pooling of filtered OTUs: if pool is T, abundances of OTUs removed by 
+# filtering are pooled and shown as "Other" in bar charts; does not apply
+# to heat maps and MDS.
+pool <- T 
+
+# maximum number of OTUs allowed in stacked bar charts
+# will be used to generate the OTU palette with randomcoloR
+maxOTUcats <- 25
+
+# logging the color scale in heat maps; set to T if you want the scale
+# in log10(relabundance); set to F if you want to keep a linear scale
+loghmscale <- T
+
+# option for performing rarefaction analysis on the unfiltered matrix
+dorareanalysis <- F
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# make a qualitative color palette
+n <- maxOTUcats
+rpalette <- distinctColorPalette(n)
+names(rpalette) <- NULL
+#########1#########2#########3#########4#########5#########6#########7#########8
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Fix the sample_metadata -------------------------------------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+# keep a copy of sample_metadata
+sample_metadata <- input_data$sample_metadata
+row.names(sample_metadata) <- sample_metadata$label
+sample_metadata_f <- sample_metadata # will be modified by sample filtering
+
+# note that input_data$sample_agg can take values "sample" and "exp. code"
+
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Create a "filtered" version of the OTU table -------------------------------
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+tOTUm <- input_data$OTU_table
+totseqs <- rowSums(tOTUm[complete.cases(tOTUm),])
+OTUmatrixf <- tOTUm[complete.cases(tOTUm),]
+
+# sample filter first
+# optionally remove samples/sample groups with less than minsampleab sequences
+# filtered samples will be also removed from the sample metadata table
+# reset filtersamples if aggregation is exp. code
+if(input_data$sample_agg == "exp. code") filtersamples <-F
+
+if (filtersamples){
+  samples_to_keep <- which(totseqs >= minsampleab)
+  if(samples_to_keep < nrow(OTUmatrixf)){
+    OTUmatrixf <- OTUmatrixf[samples_to_keep,]
+    totseqs <- rowSums(OTUmatrixf)
+    keepMetadata <- which(row.names(sample_metadata) %in% names(samples_to_keep))
+    sample_metadata_f <- sample_metadata[keepMetadata,] 
+    }
+  filtersamples_flag <- T
+}
+
+# remove "Other", "Chloroplast" and "Mitochondria"
+if (removeOther) {
+  OTUmatrixf <- OTUmatrixf[, colnames(OTUmatrixf)!= "Other"]
+}
+if (removeChloroplast){
+  OTUmatrixf <- OTUmatrixf[, colnames(OTUmatrixf)!= "Chloroplast"]
+}
+if (removeMitochondria){
+  OTUmatrixf <- OTUmatrixf[, colnames(OTUmatrixf)!= "Mitochondria"]
+}
+
+
+# optionally rarefy the samples with vegan::rrarefy()
+if (rareoption){
+  rarenn <- ifelse(raremin, 100*floor(min(totseqs)/100), raren)
+  OTUmatrixf <- vegan::rrarefy(OTUmatrixf, rarenn)
+  # drop colums with 0 sum
+  OTUmatrixf <- OTUmatrixf[, colSums(OTUmatrixf)>0]
+  OTUtokeep <- colnames(OTUmatrixf)
+  rarefy_flag <- T
+}
+
+# optionally filter OTUs which are rare and/or have low prevalence
+
+if (filterOTUs){
+  OTUmatrixf_relab <- OTUmatrixf/rowSums(OTUmatrixf)
+  maxrelab <- apply(OTUmatrixf_relab, 2, max)
+  # OTU to keep (mar rel. abundance > abtreshold AND prevalence > prev_treshold)
+  if(prev_filter){
+    pass_prev_filter <- dplyr::filter(select(prevdf, label, Prevalence), 
+                                      Prevalence > floor(nrow(sample_metadata)*prev_treshold)) %>%
+      pull(label)
+    OTUtokeep <- intersect(
+      names(which(maxrelab >= abtreshold)),
+      pass_prev_filter)
+  } else {
+    OTUtokeep <- names(which(maxrelab >= abtreshold))
+  }
+  # make a plot
+  prevdf <- apply(X = OTUmatrixf,
+                  MARGIN = 2,
+                  FUN = function(x){sum(x > 0)})
+  # Add taxonomy and total read counts to this data.frame
+  prevdf <- data.frame(Prevalence = prevdf,
+                       TotalAbundance = colSums(OTUmatrixf))
+  prevdf <- prevdf %>% 
+    rownames_to_column(var = "label") %>%
+    left_join(., select(input_data$taxa_metadata, label, phylum:species)) %>%
+    mutate(relAbundance = TotalAbundance/sum(TotalAbundance), 
+           pass_maxrelab_treshold = ifelse(label %in% OTUtokeep, "T", "F"))
+  # prevalence vs abundance graph
+  OTUmatrixf <- OTUmatrixf[, which(colnames(OTUmatrixf_relab) %in% OTUtokeep)]
+  f_seq_ret <- round(sum(OTUmatrixf)/sum(tOTUm),4)
+  title_text <- "Prevalence vs. abundance, by Phylum"
+  subtitle_text <- paste("using the filters you retain ", length(OTUtokeep), 
+                         " taxa (triangles) out of ", ncol(tOTUm), 
+                         " (", f_seq_ret*100, "% of init. seqs.)", sep ="")
+
+  # a prevalence and abundance plot
+  prev_ab_plot <- ggplot(prevdf, aes(x = TotalAbundance, y = Prevalence / nrow(OTUmatrixf), 
+                     shape = as.factor(pass_maxrelab_treshold), color = phylum)) +
+    geom_point(size = 2, alpha = 0.7) +
+    facet_wrap( ~ phylum) +
+    geom_hline(yintercept = ifelse(prev_filter, prev_treshold, 0),
+               alpha = 0.5,
+               linetype = 2) +
+    labs(x = "total abundance", y = "Prevalence [Frac. Samples]",
+         shape = 'pass ab. treshold',
+         title = title_text, subtitle = subtitle_text) +
+    scale_x_log10() +
+    scale_y_continuous(minor_breaks = seq(0, 1, 0.05)) +
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
+  print(prev_ab_plot)
+
+  filterOTU_flag <- T
+  if(prev_filter) prev_filter_flag <- T
+}
+
+filtOTU <- ncol(tOTUm)-ncol(OTUmatrixf)
+# fix sample and taxa
+sample_metadata_f <- sample_metadata_f %>%
+  mutate_at(vars(llabel, s_type, L1, L4, L6, nature, process, spoilage, 
+                 studyId, target1, target2), as.factor)
+taxa_metadata_f <- input_data$taxa_metadata %>% 
+  dplyr::filter(label %in% colnames(OTUmatrixf)) # maybe should create factors here
+
+# print a summary
+
+cat("The original OTU table has", ncol(tOTUm), "OTUs and ", 
+    nrow(tOTUm), "samples/sample groups.", "\n", "\n", sep = " ")
+
+cat("After filtering there are", "\n", nlevels(sample_metadata$llabel), 
+    "llabel groups", "\n", sep = " ")
+cat(nlevels(sample_metadata_f$L1), "food groups", "\n", sep = " ")
+cat(nlevels(sample_metadata_f$L4), "food subgroups", "\n", sep = " ")
+
+cat("After filtering/rarefaction you have removed", filtOTU, "OTU out of", 
+    ncol(tOTUm), "\n", "\n", sep = " ")
+
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Make palettes for samples -----------------------------------------------
+# The script will determine if sample labels are llabels or sample ids, based  #
+# on aggSample, loaded with the input data.                                    #
+# If the number of L4 levels is <=15 L4 will be used for palettes.             #
+# L1 will be used otherwise. To override this set overrides to T (unwise, may  #
+# result in problems in legends).                                              #
+#########1#########2#########3#########4#########5#########6#########7#########8
+catsamples <- "L4"
+maxslevels <- max(c(nlevels(sample_metadata_f$L1), 
+                    nlevels(sample_metadata_f$L4)))
+if(maxslevels>12) {
+  lspalette <- distinctColorPalette(maxslevels)
+  names(lspalette) <- NULL
+}
+
+if (!overrides){
+  catsamples <- ifelse(nlevels(sample_metadata_f$L4)<=15,
+                       "L4","L1")
+}
+samplenames <- data.frame(label = row.names(OTUmatrixf), stringsAsFactors = F)
+
+cat("There are ", nrow(OTUmatrixf), " samples in the data set, belonging to", 
+    "\n", nlevels(sample_metadata_f$L1), " food groups and ",
+    nlevels(sample_metadata_f$L4), " subgroups.", "\n",
+    catsamples, " will be used for palettes.", sep ="")
+
+groupcolors <- inner_join(samplenames, select(sample_metadata_f, label, L1, L4))
+ncolfoodg <- nlevels(groupcolors$L1)
+ncolfoodsg <- nlevels(groupcolors$L4)
+foodgpalette <- if(ncolfoodg<=12) {
+  brewer.pal(ncolfoodg, "Paired")[1:ncolfoodg]
+} else {
+  distinctColorPalette(ncolfoodg)
+}
+
+foodsgpalette <- if(ncolfoodsg<=12) {
+  brewer.pal(ncolfoodsg, "Paired")[1:ncolfoodsg]
+} else {
+  distinctColorPalette(ncolfoodsg)
+}
+
+foodgpalette <- data.frame(cbind(L1 = levels(groupcolors$L1),
+                                 fgcolor = foodgpalette))
+
+foodsgpalette <- data.frame(L4 = levels(groupcolors$L4),
+                            fsgcolor = foodsgpalette)
+
+# Merge the palettes with sample names and metadata
+groupcolors <- merge(groupcolors, foodgpalette, by = "L1")
+groupcolors <- merge(groupcolors, foodsgpalette, by = "L4")
+groupcolors <- groupcolors %>% dplyr::arrange(label)
+# Set the palette and colors and text for legends
+if (catsamples  == "L1") {
+  myspalette <- as.character(groupcolors$fgcolor)
+  mystext <- as.character(foodgpalette$L1)
+  myscolors <- as.character(foodgpalette$fgcolor)
+} else {
+  myspalette <- as.character(groupcolors$fsgcolor)
+  mystext <- as.character(foodsgpalette$L4)
+  myscolors <- as.character(foodsgpalette$fsgcolor) 
+}
+# Show the palette and plots a legend in a horizontal format
+# It might be a good idea to save the legend graph
+ltitle <- paste("Sample groups ", "(", catsamples, ", FoodEx2 class.)", sep = "")
+plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+legend("center", pch=15, legend = mystext, col = myscolors, 
+       bty = "n",
+       ncol = if(length(mystext>10)) 2 else 1,
+       title = ltitle)
+if (savegraph) {
+  par(pin = c(graphsizein,graphsizein))
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "fpal.pdf", sep = ""), width = graphsizein, 
+        height = graphsizein, paper = "default")
+  } else {
+    tiff(filename = paste(file_name, "fpal.tif", sep = ""), 
+         width = graphsizein, height = graphsizein, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+  legend("center", pch=15, legend = mystext, col = myscolors, 
+         bty = "n", 
+         ncol = if(length(mystext>10)) 2 else 1,
+         title = ltitle)
+  par(opar)
+  dev.off()
+}
+# Clean up (if you want to recreate a palette you have to run 221-306 again)    
+rm(foodgpalette, foodsgpalette, ncolfoodg, ncolfoodsg, samplenames)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Rarefaction analysis and diversity indices (optional) -----------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+if (dorareanalysis){
+  richness <- t(estimateR(tOTUm)) # should be saved or given option to save or printed
+  rarecurve(tOTUm, step = 10, col = myspalette)
+  if (savegraph) {
+    par(pin = c(graphsizein,graphsizein))
+    if (graphtype == "pdf") {
+      pdf(file = paste(file_name, "rarecurve.pdf", sep = ""), width = graphsizein, 
+          height = graphsizein, paper = "default")
+    } else {
+      tiff(filename = paste(file_name, "rarecurve.tif", sep = ""), 
+           width = graphsizein, height = graphsizein, units = "in",
+           res = graphresolution, compression = "none")
+    }
+    rarecurve(tOTUm, step = 10, col = myspalette)
+    par(opar)
+    dev.off()
+  }
+}
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Bar plots at the genus, family and class level --------------------------
+# Using rel. frequencies before filtering/rarefaction (if any).                #                                      #
+# The plots are generated only if the number of categories is <=maxOTUcats     #
+# You can change this by setting maxOTUcats in line 119                        #  
+# Note: this section will attempt to use a color brewer qualitative palette    #
+# if the number of categories for the taxonomic level are <=12,                #
+# otherwise it will use a default palette and difference in colours may be     #
+# difficult to perceive.                                                       #
+#########1#########2#########3#########4#########5#########6#########7#########8
+OTUmatrixf_relab <- OTUmatrixf/rowSums(OTUmatrixf)
+
+if (pool){
+  OTUmatrixf_relab <- cbind(OTUmatrixf_relab,1-rowSums(OTUmatrixf_relab))
+  colnames(OTUmatrixf_relab)[ncol(OTUmatrixf_relab)] <-"Other"
+} else {
+  OTUmatrixf_relab <- OTUmatrixf_relab/rowSums(OTUmatrixf_relab)  
+}
+edge_table_filtered <- reshape2::melt(t(OTUmatrixf_relab))[c(2,1,3)]
+colnames(edge_table_filtered)[1:3] <- c("source", "target", "weight")
+
+edge_table_filtered$target <- as.character(edge_table_filtered$target)
+edge_table_filtered <- left_join(edge_table_filtered, 
+                                  select(taxa_metadata_f, label, class:species), 
+                                  by  = c("target" = "label")) %>%
+  dplyr::filter(weight >0)
+
+# setting flags for bar plots
+bpgenusf <- F
+bpfamilyf <- F
+bpclassf <- F
+
+if (input_data$tax_agg != "class"){
+  if (input_data$tax_agg != "family") {
+    # Genus level
+    e_table_f_agg <- edge_table_filtered %>% 
+      group_by(source, genus) %>%
+      dplyr::summarise(weight = sum(weight)) %>%
+      mutate(genus = ifelse(is.na(genus), "Other", genus))
+    taxa_levels <- unique(e_table_f_agg$genus)
+    if ("Other" %in% taxa_levels) {
+      taxa_levels <- c(setdiff(taxa_levels,"Other"), "Other")
+    }
+    e_table_f_agg$genus <- factor(e_table_f_agg$genus, levels = taxa_levels) 
+    n_taxa <- length(levels(e_table_f_agg$genus))
+    if (n_taxa<=maxOTUcats) {
+      bpgenusf <- T
+      sbplot <- ggplot(data = e_table_f_agg, aes(x = source, y= weight, fill = genus))
+      if (n_taxa>=12) {
+        bpgenus <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+          scale_fill_manual(values = rpalette[1:n_taxa]) +
+          labs(title = "Relative abundance, genus",
+               x= "Samples/Sample groups",
+               y= "Relative abundance") +
+          theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+                panel.background= element_rect(fill = "white"),
+                plot.title = element_text(hjust = 0.5))
+        print(bpgenus)
+      } else {
+        bpgenus <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+          labs(title = "Relative abundance, genus",
+               x= "Samples/Sample groups",
+               y= "Relative abundance") +
+          scale_fill_brewer(type = "qual", palette = "Paired") +
+          theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+                panel.background= element_rect(fill = "white"),
+                plot.title = element_text(hjust = 0.5))
+        print(bpgenus)
+      }
+    } else {
+      # con shiny non deve restituire un messaggio ma un grafico
+      # o devo mettere un campo output con un messaggio
+      cat("Too many genera, genus bar chart aborted...","\n","\n")
+    }
+  }
+
+  # Family level
+  e_table_f_agg <- edge_table_filtered %>% 
+    group_by(source, family) %>%
+    dplyr::summarise(weight = sum(weight)) %>%
+    mutate(family = ifelse(is.na(family), "Other", family))
+  taxa_levels <- unique(e_table_f_agg$family)
+  if ("Other" %in% taxa_levels) {
+    taxa_levels <- c(setdiff(taxa_levels,"Other"), "Other")
+  }
+  e_table_f_agg$family <- factor(e_table_f_agg$family, levels = taxa_levels) 
+  n_taxa <- length(levels(e_table_f_agg$family))  
+  
+  if (n_taxa <= maxOTUcats) {
+    bpfamilyf <- T
+    sbplot <- ggplot(data = e_table_f_agg, aes(x = source, y= weight, fill = family))
+    if (nlevels(e_table_f_agg$Family)>=12) {
+      bpfamily <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+        scale_fill_manual(values = rpalette[1:n_taxa]) +
+        labs(title = "Relative abundance, Family",
+             x= "Samples/Sample groups",
+             y= "Relative abundance") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+              panel.background= element_rect(fill = "white"),
+              plot.title = element_text(hjust = 0.5))
+      bpfamily
+    } else {
+      bpfamily <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+        labs(title = "Relative abundance, Family",
+             x= "Samples/Sample groups",
+             y= "Relative abundance") +
+        scale_fill_brewer(type = "qual", palette = "Paired") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+              panel.background= element_rect(fill = "white"),
+              plot.title = element_text(hjust = 0.5))
+      bpfamily
+    }
+  } else {
+    cat("Too many families, family bar chart aborted...","\n","\n")
+  }
+} else {
+  cat("OTU aggregated at the Class level, Genus and Family plots skipped")
+}
+
+# Class level
+e_table_f_agg <- edge_table_filtered %>% 
+  group_by(source, class) %>%
+  dplyr::summarise(weight = sum(weight)) %>%
+  mutate(class = ifelse(is.na(class), "Other", class))
+taxa_levels <- unique(e_table_f_agg$class)
+if ("Other" %in% taxa_levels) {
+  taxa_levels <- c(setdiff(taxa_levels,"Other"), "Other")
+}
+e_table_f_agg$class <- factor(e_table_f_agg$class, levels = taxa_levels) 
+n_taxa <- length(levels(e_table_f_agg$class))  
+sbplot <- ggplot(data = e_table_f_agg, aes(x = source, y= weight, fill = class))
+if (n_taxa<=maxOTUcats){
+  bpclassf <- T
+  if (n_taxa>=12) {
+    bpclass <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+      scale_fill_manual(values = rpalette[1:n_taxa]) +
+      labs(title = "Relative abundance, Class",
+           x= "Samples/Sample groups",
+           y= "Relative abundance") +
+      theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+            panel.background= element_rect(fill = "white"),
+            plot.title = element_text(hjust = 0.5))
+    bpclass
+  } else {
+    bpclass <- sbplot + geom_bar(position = "fill", stat = "identity") + 
+      labs(title = "Relative abundance, Class",
+           x= "Samples/Sample groups",
+           y= "Relative abundance") +
+      scale_fill_brewer(type = "qual", palette = "Paired") +
+      theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+            panel.background= element_rect(fill = "white"),
+            plot.title = element_text(hjust = 0.5))
+    bpclass
+  }
+} else {
+  cat("Too many classes, class bar chart aborted...","\n","\n")
+}
+
+# saving barplots
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff") 
+  if (bpgenusf){
+    ggsave(filename = paste(file_name,"bp","genus",gfileext,sep=""),  
+           plot = bpgenus, width = 7, height = 5, dpi = graphresolution)
+  }  
+  if (bpfamilyf){
+    ggsave(filename = paste(file_name,"bp","family",gfileext,sep=""),  
+           plot = bpfamily, width = 7, height = 5, dpi = graphresolution)
+  }
+  if (bpclassf){
+    ggsave(filename = paste(file_name, "bp","class",gfileext,sep=""),  
+           plot = bpclass, width = 7, height = 5, dpi = graphresolution)
+  }
+}
+# clean up
+rm(edge_table_filtered, e_table_f_agg)
+
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Heatmaps ----------------------------------------------------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+# create a palette of 100 colours for OTU abundance
+colscale <- colorRampPalette(c("lightyellow", "orange", "brown"), 
+                             space = "rgb")(100)
+
+# remove the colums with the pooled OTUs (if any) from the filtered matrix
+# of relative frequencies
+OTUmatrixf_relab_hm <- OTUmatrixf_relab
+if (any(colnames(OTUmatrixf_relab_hm) == "Other")){
+  OTUmatrixf_relab_hm <- OTUmatrixf_relab_hm[, -which(colnames(OTUmatrixf_relab_hm) == "Other")]
+}
+
+# Create palette for OTUs. See above for instructions to override defaults
+# this should be transformed into a function
+ET3 <- taxa_metadata_f %>%
+  dplyr::filter(label %in% colnames(OTUmatrixf_relab_hm))
+# must fill the NAs with info from higher taxa
+ET3 <- ET3 %>% 
+  mutate(domain = ifelse(is.na(domain),"Other", domain)) %>%
+  mutate(phylum = ifelse(is.na(phylum), domain, phylum)) %>%
+  mutate(class = ifelse(is.na(class), phylum, class)) %>%
+  mutate(order = ifelse(is.na(order), class, order)) %>%
+  mutate(family = ifelse(is.na(family), order, family))
+
+ET3$class <- as.factor(ET3$class)
+if (input_data$tax_agg == "class"){
+  ET3$family <- ET3$class
+} else {
+  ET3$family <- as.factor(ET3$family)
+}
+ncolsfamily <- nlevels(ET3$family)
+ncolsclass <- nlevels(ET3$class)
+familypalette <- if(ncolsfamily<=12) {
+  brewer.pal(ncolsfamily, "Set3")[1:ncolsfamily]
+} else {
+  distinctColorPalette(ncolsfamily)
+}
+classpalette <- if(ncolsclass<=12) {
+  brewer.pal(ncolsclass, "Set3")[1:ncolsclass]
+} else {
+  distinctColorPalette(ncolsclass)
+}
+OTUcolors <- select(ET3,label, class, family)
+fcolors <- data.frame(family = levels(OTUcolors$family),
+                      fcolor = familypalette)
+ccolors <- data.frame(class = levels(OTUcolors$class),
+                      ccolor = classpalette)
+
+# Merge the palettes with label and lineage info
+OTUcolors <- merge(OTUcolors, ccolors, by = "class")
+OTUcolors <- merge(OTUcolors, fcolors, by = "family")
+OTUcolors <- arrange(OTUcolors, label)
+# Provide summary info, set the palette to use
+catOTUs <- "class"
+familystring <-"."
+if (input_data$tax_agg != "class"){
+  catOTUs <- "family"
+  familystring <- paste(" and ", nlevels(OTUcolors$family), 
+                         " families.",sep = "")
+  if (!overrideOTU) {
+    catOTUs <- ifelse(nlevels(OTUcolors$family)<=15,
+                      "family","class")
+  }
+}
+cat("The aggregation level for OTUs is ", input_data$tax_agg, "\n", 
+    "There are ", ncol(OTUmatrixf), " OTU in this set.", "\n",
+    "They belong to ", nlevels(OTUcolors$class), " classes",
+    familystring, "\n", "The category used for OTU palettes is ", catOTUs, ".", 
+    sep="")
+if (catOTUs == "class") {
+  myOTUpalette <- as.character(OTUcolors$ccolor)
+  myOTUtext <- as.character(ccolors$class)
+  myOTUcolors <- as.character(ccolors$ccolor)
+} else {
+  myOTUpalette <- as.character(OTUcolors$fcolor)
+  myOTUtext <- as.character(fcolors$family)
+  myOTUcolors <- as.character(fcolors$fcolor)
+}
+# Show the palette and plot a legend in a horizontal format. It might be a good
+# idea to save the palette
+par(opar)
+plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+legend("center", pch=15, legend = myOTUtext, y.intersp = 0.8,
+       col = myOTUcolors, bty = "n", title = catOTUs,
+       ncol = if(length(myOTUtext>10)) 2 else 1)
+if (savegraph) {
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "hmOTUpal.pdf", sep = ""), width = graphsizein, 
+        height = graphsizein, paper = "default")
+  } else {
+    tiff(filename = paste(file_name, "hmOTUpal.tif", sep = ""), 
+         width = graphsizein, height = graphsizein, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+  legend("center", pch=15, legend = myOTUtext, y.intersp = 0.8,
+         col = myOTUcolors, bty = "n", title = catOTUs,
+         ncol = if(length(myOTUtext>10)) 2 else 1)
+  dev.off()
+}
+# Clean up (if you want to recreate a palette you have to run again)    ####
+rm(ET3, ccolors, fcolors, classpalette, familypalette, ncolsclass,
+   ncolsfamily, familystring)
+
+
+
+# calculate distance matrices and dendrograms
+sample.dist <- vegdist(OTUmatrixf_relab_hm, method = "bray")
+# may generate warnings
+sample.clus <- hclust(sample.dist, "aver")
+OTU.dist <- vegdist(t(OTUmatrixf_relab_hm), method = "bray")
+OTU.clus <- hclust(OTU.dist, "aver")
+# may generate warnings: it is probably related to the order packages are loaded
+hm <- OTUmatrixf_relab_hm
+keyscale <- "rel. abundance"
+if (loghmscale) {
+  # lbound gives a default to 0 abundances using max number of seqs per sample
+  lbound <- 10^(-ceiling(log10(max(rowSums(tOTUm)))))
+  hm <- aaply(hm, c(1,2), 
+              function(x,minprop) log10(x+minprop),minprop=lbound)
+  keyscale <- "log10(rel.abundance)"
+}
+
+# heat map with legend for abundance levels, margins, lhei, lwid, srtCol, 
+# offsetRow and offsetCol may require tinkering.
+# Size temporarily reset for saving
+heatmap.2(hm, 
+          Rowv = as.dendrogram(sample.clus), 
+          Colv = as.dendrogram(OTU.clus),
+          srtCol = 30,
+          col = colscale,
+          breaks = 101,
+          symbreaks = F,
+          ColSideColors = myOTUpalette,
+          RowSideColors = myspalette,
+          margins = c(7,11),
+          trace = "both", density.info = "none",
+          tracecol = "orange1",
+          lhei = c(2.5,7.5),
+          lwid = c(2.5,7.5),
+          offsetRow = 0.5,
+          offsetCol = 0.5,
+          key.title = "NA",
+          key.xlab = keyscale,
+          keysize = 0.1,
+          symkey = F
+)
+if (savegraph) {
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "hm2.pdf", sep = ""), width = 10, 
+        height = 7, paper = "a4r")
+  } else {
+    tiff(filename = paste(file_name, "hm2.tif", sep = ""), 
+         width = 10, height = 7, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  heatmap.2(hm, 
+            Rowv = as.dendrogram(sample.clus), 
+            Colv = as.dendrogram(OTU.clus),
+            srtCol = 30,
+            col = colscale,
+            breaks = 101,
+            symbreaks = F,
+            ColSideColors = myOTUpalette,
+            RowSideColors = myspalette,
+            margins = c(7,11),
+            trace = "both", density.info = "none",
+            tracecol = "orange1",
+            lhei = c(2.5,7.5),
+            lwid = c(2.5,7.5),
+            offsetRow = 0.5,
+            offsetCol = 0.5,
+            key.title = "NA",
+            key.xlab = keyscale,
+            keysize = 0.1,
+            symkey = F
+  )
+  dev.off()  
+}
+par(opar)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# NMDS with vegan package -------------------------------------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+# NMDS with vegan package using Bray-Curtis distance as default
+# using OTUmatrixf (absolute abundances) works usually better, but triggers
+# the autotransform option in metaMDS; if you want you can use relative
+# abundances (use OTUmatrixf3)
+MDSall <- metaMDS(OTUmatrixf)
+MDSall
+stressplot(MDSall)
+plot(MDSall, type = "t")
+# get proper plots using ggplot2
+# make dataframes, add metadata for row names, sort to use palettes
+speciescoord <- as.data.frame(MDSall$species)
+speciescoord <- speciescoord[order(row.names(speciescoord)),]
+speciescoord$olabel <- OTUcolors[,which(colnames(OTUcolors)==
+                                          catOTUs)]
+
+samplecoord <-as.data.frame(MDSall$points)
+samplecoord <- samplecoord[order(row.names(samplecoord)),]
+samplecoord$slabel <- groupcolors[,which(colnames(groupcolors)==
+                                           catsamples)]
+rangex <- max(c(max(samplecoord$MDS1),max(speciescoord$MDS1)))
+rangey <- max(c(max(samplecoord$MDS2),max(speciescoord$MDS2)))
+minx <- min(min(samplecoord$MDS1), min(speciescoord$MDS1))
+minx <- if_else(abs(minx-trunc(minx)) < 0.5,floor(minx)-0.5,floor(minx))
+maxx <- rangex
+maxx <- if_else(ceiling(maxx)-maxx < 0.5,ceiling(maxx)+0.5,ceiling(maxx))
+miny <- min(min(samplecoord$MDS2), min(speciescoord$MDS2))
+miny <- if_else(abs(miny-trunc(miny)) < 0.5,floor(miny)+0.5,floor(miny))
+maxy <- rangey
+maxy <- if_else((ceiling(maxy)-maxy) > 0.5, ceiling(maxy)-0.5, ceiling(maxy))
+# sample MDS plot.
+MDSsampleplot <- ggplot(data = samplecoord, aes(x = MDS1, y= MDS2))
+# may be use ggrepel
+MDSsampleplot + geom_point(aes(colour = slabel)) + 
+  geom_text_repel(label = row.names(samplecoord), size = 2.5) +
+  scale_color_manual(values = myscolors) +
+  scale_x_continuous(limits = c(minx,maxx), breaks = seq(minx,maxx,0.5)) +
+  scale_y_continuous(limits = c(miny,maxy), breaks = seq(miny,maxy,0.5)) +
+  labs(title = "Non-metric MDS, samples",
+       x= "dim(1)",
+       y= "dim(2)",
+       colour = catsamples) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff")
+  ggsave(filename = paste(file_name,"MDSsamples",gfileext,sep = ""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+# species MDS plot. 
+MDSOTUplot <- ggplot(data = speciescoord, aes(x = MDS1, y= MDS2))
+MDSOTUplot + geom_point(aes(colour = olabel)) + 
+  geom_text(label = row.names(speciescoord), 
+            nudge_x = rangex/25, nudge_y = rangey/25, size = 2.0, alpha = 0.3) +
+  scale_color_manual(values = myOTUcolors) +
+  scale_x_continuous(limits = c(minx,maxx), breaks = seq(minx,maxx,0.5)) +
+  scale_y_continuous(limits = c(miny,maxy), breaks = seq(miny,maxy,0.5)) +
+  labs(title = "Non-metric MDS, OTUs",
+       x= "dim(1)",
+       y= "dim(2)",
+       colour = catOTUs) +
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff")
+  ggsave(filename = paste(file_name,"MDSspecies",gfileext,sep = ""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+# biplot 
+MDSsampleplot + geom_point(aes(colour = slabel)) + 
+  geom_text(label = row.names(samplecoord), 
+            nudge_x = rangex/25, nudge_y = rangey/25, size = 3, 
+            color = "red", alpha = 0.6) +
+  geom_text(data = speciescoord, aes(x= MDS1, y= MDS2),
+            label = row.names(speciescoord), size = 2.5, alpha = 0.3) +
+  scale_color_manual(values = myscolors) +
+  scale_x_continuous(limits = c(minx,maxx), breaks = seq(minx,maxx,0.5)) +
+  scale_y_continuous(limits = c(miny,maxy), breaks = seq(miny,maxy,0.5)) +
+  labs(x= "dim(1)",
+       y= "dim(2)",
+       colour = catsamples) +
+  theme_bw() + 
+  theme(legend.key.size = unit(0.1, "in"), 
+        legend.text = element_text(size = 6))
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff")
+  ggsave(filename = paste(file_name,"MDSbp",gfileext,sep = ""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+rm(minx, maxx, miny, maxy)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Network analysis with the bipartite package -----------------------------
+# This should be performed only if sample aggregation is Llabel.               #
+# Rarefaction and filtering are performed by default.                          #
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Calculate and plot degree distributions, separately for OTU and samples
+# using the unfiltered matrix (Other and chloroplast are  removed)
+# exponential, power law and truncated power law are given in black, dark grey 
+# and light grey, respectively. Results are saved in objects for further use
+
+OTUmatrixbip <- tOTUm[complete.cases(tOTUm),]
+
+# remove "Other" and "Chloroplast"
+OTUmatrixbip <- OTUmatrixbip[, colnames(OTUmatrixbip)!= "Other"]
+OTUmatrixbip <- OTUmatrixbip[, colnames(OTUmatrixbip)!= "Chloroplast"]
+
+OTUdd <- as.data.frame(degreedistr(OTUmatrixbip, level = "higher", 
+                                   plot.it = FALSE))
+degreedistr(OTUmatrixbip, level = "higher")
+Sampledd <- as.data.frame(degreedistr(OTUmatrixbip, level = "lower", 
+                                      plot.it = FALSE))
+degreedistr(OTUmatrixbip, level = "lower")
+
+
+# Filtering and rarefaction performed with defaults from lines 85-111          
+
+# remove samples is the sample filter was used
+if (filtersamples_flag){
+  OTUmatrixbip <- OTUmatrixbip[samples_to_keep,]
+}
+
+OTUmatrixbip2 <- OTUmatrixbip/rowSums(OTUmatrixbip)
+maxrelabbip <- apply(OTUmatrixbip2, 2, max)
+OTUtokeepbip <- names(which(maxrelabbip >= abtreshold))
+OTUmatrixbip <- OTUmatrixbip[, which(colnames(OTUmatrixbip2) %in% OTUtokeepbip)]
+totseqsbip <- rowSums(OTUmatrixbip)
+rarennbip <- ifelse(raremin, 100*floor(min(totseqsbip)/100), raren)
+OTUmatrixbip <- vegan::rrarefy(OTUmatrixbip, rarennbip)
+rarefy_flag <- T
+OTUmatrixbip <- OTUmatrixbip[,colSums(OTUmatrixbip)>0]
+OTUtokeepbip <- colnames(OTUmatrixbip)
+filtOTUbip <- ncol(tOTUm)-ncol(OTUmatrixbip)
+
+# prints a summary
+
+cat("The original OTU table has", ncol(tOTUm), "OTUs and ", 
+    nrow(tOTUm), "samples/sample groups.", "\n", "\n", sep = " ")
+
+cat("After filtering there are", "\n", n_distinct(sample_metadata$llabel), 
+    "llabel groups", "\n", sep = " ")
+cat(n_distinct(sample_metadata$L1), "food groups", "\n", sep = " ")
+cat(n_distinct(sample_metadata$L4), 
+    "food subgroups", "\n", sep = " ")
+
+cat("After filtering/rarefaction you have removed", filtOTU, "OTU out of", 
+    ncol(tOTUm), "\n", "\n", sep = " ")
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Rebuild palette for OTUs: palettes are made for family and class. Family is  #
+# is used if number of families <=15, otherwise class is used. To override     # 
+# this set overrideOTU <- T in line 74 (may result in problems in legends)     #
+#########1#########2#########3#########4#########5#########6#########7#########8
+ET3 <- taxa_metadata_f %>%
+  dplyr::filter(label %in% colnames(OTUmatrixf_relab_hm))
+ET3$class <- as.factor(ET3$class)
+if (input_data$tax_agg == "class"){
+  ET3$family <- ET3$class
+} else {
+  ET3$family <- as.factor(ET3$family)
+}
+ncolsfamily <- nlevels(ET3$family)
+ncolsclass <- nlevels(ET3$class)
+familypalette <- if(ncolsfamily<=12) {
+  brewer.pal(ncolsfamily, "Set3")[1:ncolsfamily]
+} else {
+  distinctColorPalette(ncolsfamily)
+}
+classpalette <- if(ncolsclass<=12) {
+  brewer.pal(ncolsclass, "Set3")[1:ncolsclass]
+} else {
+  distinctColorPalette(ncolsclass)
+}
+OTUcolors <- select(ET3,label, class, family)
+fcolors <- data.frame(family = levels(OTUcolors$family),
+                      fcolor = familypalette)
+ccolors <- data.frame(class = levels(OTUcolors$class),
+                      ccolor = classpalette)
+
+# Merge the palettes with OTUID and lineage info
+OTUcolors <- merge(OTUcolors, ccolors, by = "class")
+OTUcolors <- merge(OTUcolors, fcolors, by = "family")
+OTUcolors <- arrange(OTUcolors, label)
+# Provide summary info, set the palette to use
+catOTUs <- "class"
+familystring <-"."
+if (input_data$tax_agg != "class"){
+  catOTUs <- "family"
+  familystring <- paste(" and ", nlevels(OTUcolors$family), 
+                        " families.",sep = "")
+  if (!overrideOTU) {
+    catOTUs <- ifelse(nlevels(OTUcolors$family)<=15,
+                      "family","class")
+  }
+}
+
+cat("The aggregation level for OTUs is ", input_data$tax_agg, "\n", 
+    "There are ", ncol(OTUmatrixf), " OTU in this set.", "\n",
+    "They belong to ", nlevels(OTUcolors$class), " classes",
+    familystring, "\n", "The category used for OTU palettes is ", catOTUs, ".", 
+    sep="")
+
+if (catOTUs == "class") {
+  myOTUpalettebip <- as.character(OTUcolors$ccolor)
+  myOTUtextbip <- as.character(ccolors$class)
+  myOTUcolorsbip <- as.character(ccolors$ccolor)
+} else {
+  myOTUpalettebip <- as.character(OTUcolors$fcolor)
+  myOTUtextbip <- as.character(fcolors$family)
+  myOTUcolorsbip <- as.character(fcolors$fcolor)
+}
+
+# Show the palette and plot a legend in a horizontal format. It might be a good
+# idea to save the palette graph
+plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+legend("center", pch=15, legend = myOTUtextbip, y.intersp = 0.8,
+       col = myOTUcolorsbip, bty = "n", 
+       ncol = if(length(myOTUtextbip)>10) 2 else 1,
+       title = catOTUs)
+if (savegraph) {
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "bipOTUpal.pdf", sep = ""), width = graphsizein, 
+        height = graphsizein, paper = "default")
+  } else {
+    tiff(filename = paste(file_name, "bipOTUpal.tif", sep = ""), 
+         width = graphsizein, height = graphsizein, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  plot(0, 0, type = "n", bty = "n", xaxt = "n", yaxt = "n", ann = FALSE)
+  legend("center", pch=15, legend = myOTUtextbip, y.intersp = 0.8,
+         col = myOTUcolorsbip, bty = "n", 
+         ncol = if(length(myOTUtextbip)>10) 2 else 1,
+         title = catOTUs)
+  dev.off()
+}
+
+# Clean up (if you want to recreate a palette you have to run 815-892 again)    
+rm(ET3, ccolors, fcolors, classpalette, familypalette, ncolsclass,
+   ncolsfamily, familystring)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Plot the filtered web. adjust y.lim and text.width to fit labels if needed.
+# The legend may need some tinkering. Adjust y.lim and twidths to fit labels 
+# and legend if needed. The section has been tested with par(pin=c(13.5,6)).
+# In Rstudio you need to adjust the size of the plot pane.
+#########1#########2#########3#########4#########5#########6#########7#########8
+ncol_top <- case_when(
+  length(myOTUtextbip) <=5 ~ 1,
+  length(myOTUtextbip) >5 && length(myOTUtextbip) <=10 ~ 2,
+  length(myOTUtextbip) >10 && length(myOTUtextbip) <=15 ~ 3,
+  length(myOTUtextbip) >15 ~4
+  )
+ncol_bottom = case_when(
+  length(mystext) <=5 ~ 1,
+  length(mystext) >5 && length(mystext) <=10 ~ 2,
+  length(mystext) >10 && length(mystext) <=15 ~ 3,
+  length(mystext) >15 ~4
+)
+plotweb(OTUmatrixbip, text.rot = 90, y.lim=c(0,2.5), col.high = myOTUpalettebip,
+        col.low = myspalette, low.y = 0.8)
+twidthOTU <- max(strwidth(myOTUtextbip))*0.8
+sltitle <- ifelse(catsamples == "L1", "FoodEx2 class L1", "FoodEx2 class L4")
+legend("top", xjust = 0.5, yjust = 0, legend = myOTUtextbip, 
+       col = myOTUcolorsbip, bty = "n", title = catOTUs, 
+       pch = 15, cex = 0.75, ncol = ncol_top, y.intersp = 0.6, text.width = twidthOTU)
+twidths <- max(strwidth(mystext))*0.6
+legend("bottom", xjust = 0.5, yjust = 1, 
+       legend = mystext, 
+       col = myscolors, bty = "n", 
+       title = sltitle, y.intersp = 0.6,
+       pch = 15, cex = 0.75, ncol = ncol_bottom, text.width = twidths)
+if (savegraph) {
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "bipnet.pdf", sep = ""), width = graphsizein*1.2, 
+        height = graphsizein, paper = "default")
+  } else {
+    tiff(filename = paste(file_name, "bipnet.tif", sep = ""), 
+         width = graphsizein*1.2, height = graphsizein, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  plotweb(OTUmatrixbip, text.rot = 90, y.lim=c(0,2.5), col.high = myOTUpalettebip,
+          col.low = myspalette, low.y = 0.8)
+  twidthOTU <- max(strwidth(myOTUtextbip))*0.8
+  sltitle <- ifelse(catsamples == "L1", "FoodEx2 class L1", "FoodEx2 class L4")
+  legend("top", xjust = 0.5, yjust = 0, legend = myOTUtextbip, 
+         col = myOTUcolorsbip, bty = "n", title = catOTUs, 
+         pch = 15, cex = 0.75, ncol = ncol_top, y.intersp = 0.6, text.width = twidthOTU)
+  twidths <- max(strwidth(mystext))*0.6
+  legend("bottom", xjust = 0.5, yjust = 1, 
+         legend = mystext, 
+         col = myscolors, bty = "n", 
+         title = sltitle, y.intersp = 0.6,
+         pch = 15, cex = 0.75, ncol = ncol_bottom, text.width = twidths)
+  dev.off()
+}
+
+# restoring graphical parameters
+par(opar)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Visualize the web in matrix style format
+visweb(OTUmatrixbip, type = "diagonal")
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Calculate H2' for the network (the higher the value the more selective
+# the OTUs) and d' (same for samples, ranges from 0, no specialisation, to 1,
+# perfect specialist). d' for OTUs is calculated later.
+Htwo <- H2fun(OTUmatrixbip)
+dprimefood <- dfun(OTUmatrixbip)
+
+Htwo
+dprimefood
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Calculate statistics for OTU nodes and sample nodes (filtered network) and  
+# save them in dataframes
+slevelstats <- specieslevel(OTUmatrixbip)
+OTUstats <- slevelstats$`higher level`
+# join with relative abundance
+OTUfreqs <- colSums(OTUmatrixbip)/sum(OTUmatrixbip)
+OTUstats <- cbind(OTUstats,OTUfreqs)
+samplestats <- slevelstats$`lower level`
+# join the Class
+OTUstats$label <- row.names(OTUstats)
+OTUstats <- left_join(OTUstats, select(input_data$taxa_metadata, label, class))
+OTUstats$Class <- as.factor(OTUstats$class)
+# plot d values
+OTUdab <- OTUstats %>% dplyr::select(label, d, OTUfreqs, class) %>% 
+  dplyr::arrange(desc(d))
+
+dabplot <- ggplot(data = OTUdab, aes(x=d, 
+                                     y = reorder(factor(OTUdab$label), OTUdab$d),
+                                     size = OTUfreqs, 
+                                     colour = class))
+# use alternative palettes and stiles depending on the number of categories
+
+if(n_distinct(OTUdab$class)<=12){
+    dabplot + geom_point() + 
+    scale_color_brewer(type = "qual", palette = "Paired") + 
+    labs(y = "taxa", size = "rel. ab.") +
+    theme_bw()
+  } else {
+    dabplot_palette <- myOTUcolorsbip
+    names(dabplot_palette) <- myOTUtextbip
+    dabplot + geom_point() + 
+      scale_color_manual(values = dabplot_palette) + 
+      labs(y = "taxa", size = "rel. ab.") +
+      theme_bw() +
+      theme(axis.text.y = element_text(size = 16/log2(n_distinct(OTUdab$class))))
+  }
+
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff")
+  ggsave(filename = paste(file_name,"dabplot",gfileext,sep = ""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+# plot degree vs betweeness, only the OTUs with the top 20% values are labeled
+OTUstats$OTUlabel <- as.character(rep("",nrow(OTUstats)))
+lbl <- which(OTUstats$normalised.degree >= quantile(OTUstats$normalised.degree, 0.80))
+OTUstats$OTUlabel[lbl] <- OTUstats$label[lbl] 
+lbl <- which(OTUstats$weighted.betweenness != 0)
+OTUstats$OTUlabel[lbl] <- OTUstats$label[lbl] 
+degbplot <- ggplot(data = OTUstats, aes(x = normalised.degree,
+                                        y = weighted.betweenness,
+                                        colour = Class,
+                                        size = OTUfreqs))
+if(n_distinct(OTUstats$class)<=12){
+  degbplot + geom_point() + 
+    geom_text_repel(aes(label = OTUlabel), colour = "black", 
+                    alpha = 0.6, size = 3) + 
+    labs(x = "normalised degree", y = "weighted betweenness") +
+    scale_color_brewer(type = "qual", palette = "Paired") + 
+    theme_bw()
+} else {
+  degplot_palette <- myOTUcolorsbip
+  names(degplot_palette) <- myOTUtextbip
+  degbplot + geom_point() + 
+    geom_text_repel(aes(label = OTUlabel), colour = "black", 
+                    alpha = 0.6, size = 3) + 
+    labs(x = "normalised degree", y = "weighted betweenness") +
+    scale_color_manual(values = dabplot_palette) + 
+    theme_bw()
+}
+
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff")
+  ggsave(filename = paste(file_name,"degbplot",gfileext,sep = ""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Recalculate degree distributions, separately for OTU and samples
+# using the filtered matrix
+OTUddf <- as.data.frame(degreedistr(OTUmatrixbip, level = "higher", 
+                                    plot.it = FALSE))
+degreedistr(OTUmatrixf, level = "higher")
+Sampleddf <- as.data.frame(degreedistr(OTUmatrixbip, level = "lower", 
+                                       plot.it = FALSE))
+degreedistr(OTUmatrixbip, level = "lower")
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Compute and plot modules, may need to tamper with labsize
+mylabsize <- 0.6
+
+moduleWebObject <- computeModules(OTUmatrixbip);
+plotModuleWeb(moduleWebObject, labsize = mylabsize)
+if (savegraph) {
+  if (graphtype == "pdf") {
+    pdf(file = paste(file_name, "modw.pdf", sep = ""), width = graphsizein, 
+        height = graphsizein, paper = "default")
+  } else {
+    tiff(filename = paste(file_name, "modw.tif", sep = ""), 
+         width = graphsizein, height = graphsizein, units = "in",
+         res = graphresolution, compression = "none")
+  }
+  moduleWebObject <- computeModules(OTUmatrixbip);
+  plotModuleWeb(moduleWebObject, labsize = mylabsize)
+  dev.off()
+}
+
+# restoring graphical parameters
+par(opar)
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Calculate network level stats. Only some options are included.               #
+# For small networks you may run                                               #
+# netstats <- as.data.frame(networklevel(OTUmatrixf, index = "ALLBUTDD"        #
+# Run this only at the end, may cause crashes for large matrices.              #
+# Make sure you save files and export the plots before you run it              #
+#########1#########2#########3#########4#########5#########6#########7#########8
+netstats <- as.data.frame(networklevel(OTUmatrixbip, 
+                                       index = c("connectance", 
+                                                 "weighted connectance", 
+                                                 "nestedness", 
+                                                 "weighted nestedness", 
+                                                 "cluster coefficient")))
+colnames(netstats)<-"index"
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Save individual dataframes (as .txt files) for future use                    # 
+#########1#########2#########3#########4#########5#########6#########7#########8
+write.table(OTUstats, file = paste(file_name_prefix, "OTUstats.txt", sep = ""), 
+            append = FALSE, sep = "\t", col.names = TRUE, 
+            row.names = TRUE)
+write.table(samplestats, file = paste(file_name_prefix, "samplestats.txt", sep = ""), 
+            append = FALSE, sep = "\t", col.names = TRUE, 
+            row.names = TRUE)
+write.table(netstats, file = paste(file_name_prefix, "netstats.txt", sep = ""), 
+            append = FALSE, sep = "\t", col.names = TRUE, row.names = TRUE)
+
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Bonus plot --------------------------------------------------------------
+# bar plot with the x taxa with the highest absolute abundance.               #
+# The abundances of the remaining OTUs are optionally pooled.                  #                                                                       #
+#########1#########2#########3#########4#########5#########6#########7#########8
+OTUsums <- colSums(OTUmatrixbip)
+# topx should be <20 and definitely <25
+topx <- 19
+topxOTUnodesab <- names(OTUsums[order(OTUsums, decreasing = TRUE)])[1:topx]
+OTUmatrixf3 <- OTUmatrixbip[,which(colnames(OTUmatrixbip) %in% topxOTUnodesab)]
+if (pool) {
+  if (rarefy_flag){
+    sampleSums <- round(rarennbip*(totseqs-totseqsbip)/totseqs,0)+rarennbip
+  } else {sampleSums <- totseqs}
+} else {
+  sampleSums <- rowSums(OTUmatrixbip)
+}
+OTUmatrixf3 <- OTUmatrixf3/sampleSums
+Other <- 1-rowSums(OTUmatrixf3)
+OTUmatrixf3 <- cbind(OTUmatrixf3, Other)
+
+ET3 <- melt(OTUmatrixf3, value.name = "Weight")
+colnames(ET3)[1:2] <- c("Sample", "OTU")
+# make a palette
+ncols <- nlevels(ET3$OTU)
+# make a qualitative color palette
+bp_palette <- distinctColorPalette(ncols)
+names(bp_palette) <- levels(ET3$OTU)
+mygtitle <- paste("Relative abundance, top", ncols, "taxa (based on tot seqs)")
+
+sbplot <- ggplot(data = ET3, aes(x = Sample, y= Weight, fill = OTU))
+if (topx<=12) {
+  sbplot + geom_bar(position = "fill", stat = "identity") + 
+    labs(title = str_wrap(mygtitle,40),
+         x= "Samples/Sample groups",
+         y= "Relative abundance",
+         fill = "taxa") +
+    scale_fill_brewer(type = "qual", palette = "Paired") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+          panel.background= element_rect(fill = "white"),
+          legend.key.size = unit(0.2, "in"),
+          plot.title = element_text(hjust = 0.5))
+} else {
+  sbplot + geom_bar(position = "fill", stat = "identity") + 
+    labs(title = str_wrap(mygtitle,40),
+         x= "Samples/Sample groups",
+         y= "Relative abundance",
+         fill = "taxa") +
+    scale_fill_manual(values = bp_palette) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          panel.background= element_rect(fill = "white"),
+          legend.key.size = unit(0.2, "in"),
+          plot.title = element_text(hjust = 0.5))
+}
+if (savegraph) {
+  gfileext <- ifelse (graphtype == "pdf", ".pdf", ".tiff") 
+  ggsave(filename = paste(file_name, "topxab", gfileext, sep=""), 
+         width = 7, height = 5, dpi = graphresolution)
+}
+rm(ET3, OTUmatrixf3)
+
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Save an image of the workspace: please realize that some objects which are
+# recycled in the script must be created afresh (i.e. ET3, ET4, OTUmatrixf3)
+save.image(file = paste(file_name_prefix, "image.Rdata", sep = ""))
+# if you want to do some clean up use rm(list = ls()) before running 
+# the script again
+# rm(list = ls())
+
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Credits and citation ----------------------------------------------------
+#########1#########2#########3#########4#########5#########6#########7#########8
+# Script created by Eugenio Parente, 2018.                                     #
+# The checkpackages function is derived from http://tinyurl.com/jjwyzph        #
+# The code for making qualitative palette is derived from:                     #
+# http://tinyurl.com/hawqufy                                                   #
+# The code for heat maps is modified from: http://tinyurl.com/hxxbmvz          #
+# assume this is under GNU general public licence                              #
+# http://www.gnu.org/licenses/gpl-3.0.en.html                                  #
+# if you decide to use this script in your work, please mention                #
+# the FoodMicrobionet web site                                                 #
+# http://www.foodmicrobionet.org                                               #
+# and cite relevant publications therein as appropriate                        #
+# References for packages used in this script:                                 #
+citation(package = "plyr", lib.loc = NULL, auto = NULL)
+citation(package = "dplyr", lib.loc = NULL, auto = NULL)
+citation(package = "ggplot2", lib.loc = NULL, auto = NULL)
+citation(package = "reshape2", lib.loc = NULL, auto = NULL)
+citation(package = "gplots", lib.loc = NULL, auto = NULL)
+citation(package = "RColorBrewer", lib.loc = NULL, auto = NULL)
+citation(package = "vegan", lib.loc = NULL, auto = NULL)
+citation(package = "randomcoloR", lib.loc = NULL, auto = NULL)
+citation(package = "bipartite", lib.loc = NULL, auto = NULL)
+citation(package = "ggrepel", lib.loc = NULL, auto = NULL)
+#########1#########2#########3#########4#########5#########6#########7#########8
+# this script was successfully tested on the following systems:
+# iMac 21.5 inches late 2013, MacOS 10.11.6, R 3.3.2, Rstudio 1.0.136
+# MacBook Pro Retina 13", 2.7 GHz Intel Core i5, MacOS 10.12.4, R 3.3.2, Rstudio 1.0.136
+# Intel Core i5 CPU@2.67 GHz with Windows 10 Home Edition, 64 bit, R3.3.3, 
+#       Rstudio 1.0.136
+#########1#########2#########3#########4#########5#########6#########7#########8
+# future plans:
+# transform the script in an interactive Rmarkdown document
+# improve filtering
+# use function to automate/improve some of the actions i.e.
+#     creation of palettes for samples
+# use functions from phyloseq and SpiecEasi to estimate entworks
+# improve the way the format of the input data is checked
+# offer different abundance/prevalence filters
+# add options for aggregating taxa (if too many)
+# add an option for using absolute or relative abundances in vegan::metaMDS
+# maybe make alpha a function of the number of points in the MDS plots 
+# automatically skip bipartite analysis if sample agg is not llabel
+# improve the control of options in plotweb
+
+
+
+
