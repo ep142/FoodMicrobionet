@@ -1,0 +1,12 @@
+This is an old version of the FMBN analyzer script.
+This script was created as a way to run graphical and statistical analysis on data extracted from FoodMicrobionet v 3.1 using the ShinyFMBN v1.2 app.
+You can learn more on these versions of the database and the app here: https://www.sciencedirect.com/science/article/abs/pii/S0168160519301692?via%3Dihub
+The material is also available on Mendeley data where you can find the most recent version
+https://data.mendeley.com/datasets/8fwwjpm79y/3
+Basically, the FMBN analyzer will let you import a list created with the ShinyFMBN app (you have to save using the <agg> button).
+Instructions are provided as comments in the code, but basically:
+1. you can set a few options about saving graphs, performing rarefaction, filtering etc.
+2. do bar graphs for abundance
+3. perform MDS on the OTU table and get both the sample and taxa plots
+4. create heatmaps
+5. do some bipartite network analysis
