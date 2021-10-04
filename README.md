@@ -1,2 +1,15 @@
 # FoodMicrobionet
-This repository will eventually contain the different versions of FoodMicrobionet (as Shiny apps) and of the R scripts cretated to access the data or to do statistical and graphical analysis. The top level will also contain the scripts used to launch the different versions of the app.
+
+This repository will eventually contain the different versions of FoodMicrobionet (as Shiny apps) and of the R scripts created to access the data or to do statistical and graphical analysis.
+
+-   folder dada2_pipeline contains a modified version of the [DADA2 pipeline](https://benjjneb.github.io/dada2/tutorial.html "link to the DADA2 pipeline") suitable for (reasonably) small datasets. I have tested it on oldish Macs (a late 2013 iMac and a late 2015 MacBook Pro, both with 8 Gb RAM) with MacOS 10.14.6 and it works reasonably well with V3-V4 datasets of no more than 50 samples (although you might have to run a few steps overnight). The script has handy options for paired-end and non-paired end files, and for Illumina, IonTorrent and old 454 files. You do need to set a few things and at least have a look at the end of a few steps (quality control, trimming and filtering, ASV inference), but otherwise you don't have to stay there all the time: a beep will alert when a time consuming step is finished. Please pay attention at the structure of folders and files required by the pipeline or adapt the corresponding instructions
+
+-   folder dada2_pipeline contains a modified version of the previous pipeline and is based of the [DADA2 pipeline](https://benjjneb.github.io/dada2/tutorial.html "link to the DADA2 pipeline") for big data. I have tested on the same machines with more than 800 samples (usually V4). It is divided in three parts:
+
+    -   first, the sequences are divided in groups based on the machine lane data of the headers of the fastq files
+
+    -   second, you have to process the sequences in groups (in interactive mode, although you do not have to sit there staring at the screen all the time, a beep will tell you when time consuming steps are finished): the results are phyloseq objects
+
+    -   third, a script will merge the phyloseq objects and perform taxonomic assignment (you can split the process in groups to avoid running into memory problems)
+
+    -   fourth: everything is assembled in the object I need to populate FoodMicrobionet

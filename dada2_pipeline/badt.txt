@@ -1,0 +1,63 @@
+rank	s_label	Kingdom	Phylum	Class	Order	Family	Genus	ranks_present	ranks_expected
+family	Gracilibacteraceae	Bacteria	Firmicutes	Clostridia	Gracilibacteraceae		NA	4	5
+family	Hadarchaeales	Archaea	Hadarchaeota	Hadarchaeia	Hadarchaeales		NA	4	5
+family	Thioprofundaceae	Bacteria	Proteobacteria	Gammaproteobacteria	Thioprofundaceae		NA	4	5
+genus	Alkalibaculum	Bacteria	Firmicutes	Clostridia	Eubacteriales	Alkalibaculum		5	6
+genus	Alkaliphilus	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Alkaliphilus		5	6
+genus	Anaerobranca	Bacteria	Firmicutes	Clostridia	Proteinivoracales	Anaerobranca		5	6
+genus	Anaeromicrobium	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Anaeromicrobium		5	6
+genus	Anaerovirgula	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Anaerovirgula		5	6
+genus	Anoxynatronum	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Anoxynatronum		5	6
+genus	BBMC-4	Bacteria	Fibrobacterota	Fibrobacteria	Fibrobacterales	BBMC-4		5	6
+genus	Brassicibacter	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Brassicibacter		5	6
+genus	Caldanaerovirga	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Caldanaerovirga		5	6
+genus	Caldinitratiruptor	Bacteria	Firmicutes	Symbiobacteriia	Symbiobacteriales	Caldinitratiruptor		5	6
+genus	Caldisalinibacter	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Caldisalinibacter		5	6
+genus	Caloranaerobacter	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Caloranaerobacter		5	6
+genus	Candidatus Aenigmarchaeum	Archaea	Aenigmarchaeota	Aenigmarchaeia	Aenigmarchaeales	Candidatus Aenigmarchaeum		5	6
+genus	Candidatus Iainarchaeum	Archaea	Iainarchaeota	Iainarchaeia	Iainarchaeales	Candidatus Iainarchaeum		5	6
+genus	Candidatus Jidaibacter	Bacteria	Proteobacteria	Alphaproteobacteria	Rickettsiales	Candidatus Jidaibacter		5	6
+genus	Candidatus Micrarchaeum	Archaea	Micrarchaeota	Micrarchaeia	Micrarchaeales	Candidatus Micrarchaeum		5	6
+genus	Candidatus Protistobacter	Bacteria	Proteobacteria	Gammaproteobacteria	Burkholderiales	Candidatus Protistobacter		5	6
+genus	Candidatus Spiroplasma	Bacteria	Firmicutes	Bacilli	Entomoplasmatales	Candidatus Spiroplasma		5	6
+genus	Chitinispirillum	Bacteria	Fibrobacterota	Fibrobacteria	Fibrobacterales	Chitinispirillum		5	6
+genus	Clostridiisalibacter	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Clostridiisalibacter		5	6
+genus	Clostridium sensu stricto	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Clostridium sensu stricto		5	6
+genus	Coralloluteibacterium	Bacteria	Proteobacteria	Gammaproteobacteria	Xanthomonadales	Coralloluteibacterium		5	6
+genus	Desulfatiferula	Bacteria	Desulfobacterota	Desulfobacteria	Desulfobacterales	Desulfatiferula		5	6
+genus	Fervidicola	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Fervidicola		5	6
+genus	Gelria	Bacteria	Firmicutes	Incertae Sedis	Gelria		NA	4	6
+genus	Gottschalkia	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Gottschalkia		5	6
+genus	Gracilibacter	Bacteria	Firmicutes	Clostridia	Gracilibacteraceae	Gracilibacter		5	6
+genus	Guggenheimella	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Guggenheimella		5	6
+genus	Hydrogenispora	Bacteria	Firmicutes	Limnochordia	Hydrogenispora		NA	4	6
+genus	Hydrogenoanaerobacterium	Bacteria	Firmicutes	Clostridia	Oscillospirales	Hydrogenoanaerobacterium		5	6
+genus	JTB215	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	JTB215		5	6
+genus	livecontrolB21	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	livecontrolB21		5	6
+genus	Lutispora	Bacteria	Firmicutes	Clostridia	Gracilibacteraceae	Lutispora		5	6
+genus	Marine Group III	Archaea	Thermoplasmatota	Thermoplasmata	Marine Group III		NA	4	6
+genus	Marinibaculum	Bacteria	Proteobacteria	Alphaproteobacteria	Ferrovibrionales	Marinibaculum		5	6
+genus	MCWD3	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	MCWD3		5	6
+genus	Methylohalomonas	Bacteria	Proteobacteria	Gammaproteobacteria	Granulosicoccales	Methylohalomonas		5	6
+genus	Natronincola	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Natronincola		5	6
+genus	Paludibaculum	Bacteria	Acidobacteriota	Acidobacteriae	Paludibaculum		NA	4	6
+genus	Proteinivorax	Bacteria	Firmicutes	Clostridia	Proteinivoracales	Proteinivorax		5	6
+genus	Serpentinicella	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Serpentinicella		5	6
+genus	Sporosalibacterium	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Sporosalibacterium		5	6
+genus	Taonella	Bacteria	Proteobacteria	Alphaproteobacteria	Ferrovibrionales	Taonella		5	6
+genus	TC1	Bacteria	Firmicutes	Desulfitobacteriia	Desulfitobacteriales	TC1		5	6
+genus	Tepidanaerobacter	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Tepidanaerobacter		5	6
+genus	Thermogymnomonas	Archaea	Thermoplasmatota	Thermoplasmata	Thermoplasmatales	Thermogymnomonas		5	6
+genus	Thermohalobacter	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Thermohalobacter		5	6
+genus	Thermosediminibacter	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Thermosediminibacter		5	6
+genus	Thermovenabulum	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Thermovenabulum		5	6
+genus	Thermovorax	Bacteria	Firmicutes	Thermovenabulia	Thermovenabulales	Thermovorax		5	6
+genus	Thioprofundum	Bacteria	Proteobacteria	Gammaproteobacteria	Thioprofundaceae	Thioprofundum		5	6
+genus	Tindallia	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	Tindallia		5	6
+genus	uncultured	Archaea	Halobacterota	Halobacteria	Halobacterales	uncultured		5	6
+genus	uncultured	Archaea	Halobacterota	Methanocellia	Methanocellales	uncultured		5	6
+genus	uncultured	Archaea	Halobacterota	Methanomicrobia	Methanomicrobiales	uncultured		5	6
+genus	uncultured	Archaea	Thermoplasmatota	uncultured		NA	NA	3	6
+genus	uncultured	Bacteria	Firmicutes	Clostridia	Gracilibacteraceae	uncultured		5	6
+genus	uncultured	Bacteria	Firmicutes	Clostridia	Peptostreptococcales-Tissierellales	uncultured		5	6
+genus	uncultured	Bacteria	Proteobacteria	Alphaproteobacteria	Ferrovibrionales	uncultured		5	6
