@@ -8,8 +8,8 @@ This repository will eventually contain the different versions of FoodMicrobione
 
     -   first, the sequences are divided in groups based on the machine lane data of the headers of the fastq files
 
-    -   second, you have to process the sequences in groups (in interactive mode, although you do not have to sit there staring at the screen all the time, a beep will tell you when time consuming steps are finished): the results are phyloseq objects
+    -   second, you have to process the sequences in groups (in interactive mode, although you do not have to sit there staring at the screen all the time, a beep will tell you when time consuming steps are finished): the results are sequence tables. Most things are basically what you can find in the bioconductor_pip_v6 script, which you can find in the dada2_pipeline folder
 
-    -   third, a script will merge the phyloseq objects and perform taxonomic assignment (you can split the process in groups to avoid running into memory problems)
+    -   third, a script will merge the sequence tables and perform taxonomic assignment (you can split the process in groups to avoid running into memory problems) and, optionally, infer a phylogenetic tree
 
-    -   fourth: everything is assembled in the object I need to populate FoodMicrobionet
+    -   fourth: everything is assembled in the objects I need to populate FoodMicrobionet
