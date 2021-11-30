@@ -34,7 +34,7 @@ if("tax_database" %in% colnames(study)) {
 #cross-check number of samples, expression must be TRUE
 study$samples == n_samples_edge
 
-# ad hoc changed, will not be necessary for more recent versions of the study
+# ad hoc changes, will not be necessary for more recent versions of the study
 # file (after December 2021)
 
 study$primer_f <- "26F4a" # AGAGTTTGATCMTGGCTCAG
@@ -67,7 +67,7 @@ study <- bind_cols(study, pip_fields, empty_fields) %>%
   select(study,	studyId, FMBN_version, target, region, platform,	
          read_length_bp, seq_center,	bioinf_software,	OTU_picking,	
          assign_tax_method,	tax_database,	Seq_accn,	Seq_accn_link,	bioproject,	
-         samples,	food_group, short_descr, DOI_link, ref_short, year, 
+         samples,	food_group, short_descr, DOI, DOI_link, ref_short, year, 
          ref_complete, corr_author_surname, corr_author_mail, geoloc, 
          primer_f, primer_r, overlapping, paired_end)
 
@@ -387,3 +387,22 @@ anyNA(edges)
 write_tsv(select(edges, sampleId, taxonId, weight, Source, otulabel = s_label), 
           paste(study$Seq_accn, "_edges_to_FMBN.txt", sep = ""))
 
+
+# Credits and copyright ---------------------------------------------------
+
+# Assume that this is overall under MIT licence
+
+# Copyright 2021 Eugenio Parente
+# Permission is hereby granted, free of charge, to any person obtaining 
+# a copy of this software and associated documentation files (the "Software"), 
+# to deal in the Software without restriction, including without limitation 
+# the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+# and/or sell copies of the Software, and to permit persons to whom the Software 
+# is furnished to do so, subject to the following conditions:
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+# SOFTWARE.
