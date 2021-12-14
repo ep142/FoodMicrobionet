@@ -18,7 +18,7 @@ The structure of the database was changed and is now more coherent with that of 
 
 6. **edges table** (edges, the source is a sample, the target a taxon, formerly edge table): data on sample - taxon edges, with abundances; linked to the study table by studyId, the sample table by sampleId, the taxon table by taxonId 
 
-The structure of the database is illustrated in Figure 1.
+The structure of the database is illustrated in Figure 1. Phyloseq objects are connected to studies via studyId but not included in the main database.
 
 ![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/image001.png)
 
