@@ -8,22 +8,24 @@ The structure of the database was changed and is now more coherent with that of 
 
 1. **studies table** : data on the studies included in FMBN. Includes info on the target (16S DNA or cDNA or both, region) sequencing platform, bioinformatic pipeline, sequence accession number, number of samples, bibliographic information; linked to the other tables by studyID  
 
-2. **samples table** (sample nodes): data on the samples included in FMBN, see below; linked to the study table by studyId and to edge table by sampleId  
+2. **primers table**: information on primers
 
-3. **taxa table** (OTU nodes, formerly lineages table): data on taxa included in FMBN, see below; linked to the edge table by taxonId  
+3. **samples table** (sample nodes): data on the samples included in FMBN, see below; linked to the study table by studyId and to edge table by sampleId  
 
-4. **edges table** (edges, the source is a sample, the target a taxon, formerly edge table): data on sample - taxon edges, with abundances; linked to the study table by studyId, the sample table by sampleId, the taxon table by taxonId  
-5. **FoodEx2 table** : for convenience only; this table includes all codes from Exposure hierarchy from revision 2  
+4. **FoodEx2 table** : for convenience only; this table includes all codes from Exposure hierarchy from revision 2  
 
+5. **taxa table** (OTU nodes, formerly lineages table): data on taxa included in FMBN, see below; linked to the edge table by taxonId  
+
+6. **edges table** (edges, the source is a sample, the target a taxon, formerly edge table): data on sample - taxon edges, with abundances; linked to the study table by studyId, the sample table by sampleId, the taxon table by taxonId 
 
 The structure of the database is illustrated in Figure 1.
+
+![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/image001.png)
 
 The emphasis is now on data extraction and processing using a range of R Shiny apps, and most of the new features were designed to facilitate processing with other software packages (Microsoft Excel, Gephi, Cytoscape, the CoNet App of Cytoscape, the bipartite package and the phyloseq package of R). To learn more on FMBN visit our web site at: [http://www.foodmicrobionet.org](http://www.foodmicrobionet.org/).
 
 All scripts are available at [https://github.com/ep142/FoodMicrobionet](https://github.com/ep142/FoodMicrobionet).
 
-
-![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/image001.png)
 
 **The studies table**.
 
