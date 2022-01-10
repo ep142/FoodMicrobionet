@@ -1,5 +1,5 @@
 
-# runShinyFMBN v 2_1_4 ------------------------------------------------------
+# runShinyFMBN v 2_3 ------------------------------------------------------
 
 # This script will:
 # a. check if you have all the packages needed to run ShinyFMBN, 
