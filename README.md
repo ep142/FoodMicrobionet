@@ -33,3 +33,5 @@ This repository will eventually contain the different versions of FoodMicrobione
     - set the options for filtering, saving etc. in the chunk below  
 
     - knit the document (the default is to .html, but you can change the YAML header (or choose the appropriate option in the Knit menu) to obtain .pdf (need LaTex) or MS Word documents  
+    
+-  folder **merge_phyloseq_objs** contains a small proof-of-concept script which would allow you to merge physeq objects extracted from FoodMicrobionet with your own physeq objects (provided they are obtained using the DADA2 pipeline). In principle, this would simplify comparisons of your own data with data from the literature.  
