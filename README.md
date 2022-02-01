@@ -36,5 +36,5 @@ This repository will eventually contain the different versions of FoodMicrobione
     
 -  folder **merge_phyloseq_objs** contains a small proof-of-concept script which would allow you to merge physeq objects extracted from FoodMicrobionet with your own physeq objects (provided they are obtained using the DADA2 pipeline). In principle, this would simplify comparisons of your own data with data from the literature.  
 
-- folder **the_real_thing** contains the database in two formats: R lists and Excel files. Both are safer to use than text files for which occasional problems with accented letters and special characters occur in different locales  
+- folder **the_real_thing** contains the database in two formats: R lists and Excel files (each in their own folder). Both are safer to use than text files for which occasional problems with accented letters and special characters occur in different locales. As a bonus, I am including in the folder with the R listas a .Rmd document designed to provide a statistical report on the current version of FMBN  
 
