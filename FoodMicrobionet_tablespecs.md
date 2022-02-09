@@ -167,7 +167,7 @@ The **samples** table includes metadata for samples/nodes. The current version o
 
   + **geo\_loc\_country** : the country where the sample was collected  
   
-  +   **geo\_loc\_continent** : the continent where the sample was collected  
+  + **geo\_loc\_continent** : the continent where the sample was collected  
   
   + **lat\_lon** : the coordinates of the place where the sample was collected  
 

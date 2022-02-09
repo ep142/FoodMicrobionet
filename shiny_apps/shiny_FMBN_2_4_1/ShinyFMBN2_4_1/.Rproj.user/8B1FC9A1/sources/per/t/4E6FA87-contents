@@ -1,0 +1,103 @@
+# assemble_FMBN, a script for assembling .rds file for FMBN
+
+# v 3 10/04/2020
+
+# reading FoodMicrobionet files -------------------------------------------
+
+# install/load packages
+
+.cran_packages <- c("readxl","tidyverse")
+.inst <- .cran_packages %in% installed.packages()
+if(any(!.inst)) {
+  install.packages(.cran_packages[!.inst])
+}
+
+sapply(c(.cran_packages), require, 
+       character.only = TRUE)
+
+# version
+version_n <- "3.2.5"
+last_updated <- "10/04/2020"
+version_text <- paste("This is version ", version_n, 
+                      " of FoodMicrobionet. Last updated ", last_updated, ".", sep = "")
+saveRDS(version_text, file = "version.rds")
+
+samples_fn <- file.choose()
+samples_fn
+samples <- read_excel(samples_fn, col_types = c(rep("guess", 20), rep("text",3)))
+# check for duplicates
+sum(duplicated(samples$label_2))==0 # must be true, otherwise there are duplicated sample labels
+# find duplicated labels
+if(sum(duplicated(samples$label_2))>0){
+  dupli_sample_labels <- samples$label_2[duplicated(samples$label_2)]
+}
+# check if sample Id match row numbers
+# this is necessary for sample extraction in the Shiny app: mismatches would 
+# cause wrong samples to be selected in the aggregate tab
+all(samples$sampleId == 1:nrow(samples))
+if(!all(samples$sampleId == 1:nrow(samples))) which(samples$sampleId != 1:nrow(samples))
+
+saveRDS(samples, file = "samples.rds")
+
+studies_fn <- file.choose()
+studies_fn
+studies <- read_excel(studies_fn)
+saveRDS(studies, file = "studies.rds")
+
+edges_fn <- file.choose()
+edges_fn
+edges <- read_excel(edges_fn)
+saveRDS(edges, file = "edges.rds")
+
+taxa_fn <- file.choose()
+taxa_fn
+taxa <- read_excel(taxa_fn)
+# check for duplicated names (should have no effect really)
+sum(duplicated(taxa$label)) == 0 # must be true
+# which are duplicated?
+if(sum(duplicated(taxa$label))>0){
+  dupli_taxa_labels <- taxa$label[duplicated(taxa$label)]
+}
+
+saveRDS(taxa, file = "taxa.rds")
+
+references <- tibble(studyId = rep("Foodmicrobionet",3),
+                        ref_complete = c(
+                          paste0("Parente, E., Cocolin, L., De Filippis, F., Zotta, T., ",
+                                 "Ferrocino, I., O’Sullivan, O., Neviani, E., De Angelis, ",
+                                 "M., Cotter, P. D., Ercolini, D. 2016. FoodMicrobionet: a ",
+                                 "database for the visualisation and exploration of food ",
+                                 "bacterial communities based on network analysis. Int. J. ",
+                                 "Food Microbiol. 219: 28-37.", sep =""),
+                          paste0("De Filippis, F., Parente, E., Zotta, T., Ercolini, D. 2018.", 
+                                 "A comparison of bioinformatic approaches for 16S rRNA gene ",
+                                 "profiling of food bacterial microbiota. Int. J. Food Microbiol. 265:9-17.",
+                                 sep = ""),
+                          paste0("Parente, E., De Filippis, F., Ercolini, D., Ricciardi, A., Zotta, T., 2019. ", 
+                                 "Advancing integration of data on food microbiome studies: FoodMicrobionet ",
+                                 "3.1, a major upgrade of the FoodMicrobionet database. Int. J. Food Microbiol. : 305:108249.",
+                                 sep = "")
+                          ),
+                        DOI = c("10.1016/j.ijfoodmicro.2015.12.001",
+                                "10.1016/j.ijfoodmicro.2017.10.028",
+                                "10.1016/j.ijfoodmicro.2019.108249")
+                        )
+saveRDS(references, file = "references.rds")
+
+# app and copyright lines
+app_line <- "ShinyFMBN2 (v 2.3) is designed to provide an interface to:"
+copyright_line <- "Copyright 2018, 2019, 2020 Eugenio Parente, Università della Basilicata"
+
+# building and saving the list
+FMBN <- list(
+  studies = studies,
+  samples = samples,
+  edges = edges,
+  taxa = taxa,
+  references = references,
+  version = version_text,
+  app_text = app_line,
+  copyright_text = copyright_line
+  
+)
+saveRDS(FMBN, file = "FMBN.rds")
