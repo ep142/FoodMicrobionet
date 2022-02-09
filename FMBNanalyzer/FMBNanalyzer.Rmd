@@ -1,5 +1,5 @@
 ---
-title: "FMBNanalyzer.Rmd"
+title: "FMBNanalyzer.Rmd, v 2.3"
 subtitle: "A .rmd document for generating reports using data extracted from FMBN"
 author: "E. Parente, Scuola SAFE, Università degli Studi della Basilicata"
 date: "`r format(Sys.time(), '%d %B %Y')`"
@@ -36,48 +36,53 @@ set.seed(1234)
 
 ```
 
-v2.2 4/1/2022
+v2.3 9/2/2022
 
-# How do I use this document?  
+# How do I use this document?
 
-The purpose of this .Rmd document is to generate a report with a number of descriptive graphs and tables (and save them, as applicable) using data extracted from ShinyFMBN (find more on [GitHub](https://github.com/ep142/FoodMicrobionet) or on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4)) an app to explore the [FoodMicrobionet database](http://www.foodmicrobionet.org) of metataxonomic data on the composition of bacterial communities in foods.  
+The purpose of this .Rmd document is to provide a template for a report with a number of descriptive graphs and tables (and save them, as applicable) using data extracted from ShinyFMBN (find more on [GitHub](https://github.com/ep142/FoodMicrobionet) or on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4)) an app to explore the [FoodMicrobionet database](http://www.foodmicrobionet.org) of metataxonomic data on the composition of bacterial communities in foods.
+
 To use this document you need to:
 
-* perform a search in ShinyFMBN and export the __agg__ file: see the manual for ShinyFMBN on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4) for further details  
+-   save a copy of the original document, whose most recent version you can download from [GitHub](https://github.com/ep142/FoodMicrobionet/tree/master/FMBNanalyzer)
 
-* put the file (you will find it in the output -> aggdata folder, located in the app folder) in a new folder containing this template  
+-   perform a search in ShinyFMBN and export the **agg** file: see the manual for ShinyFMBN on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4) for further details
 
-* [create a RStudio project](https://support.rstudio.com/hc/en-us/articles/200526207-Using-RStudio-Projects) for that folder  
+-   put the file (you will find it in the output -> aggdata folder, located in the app folder) in a new folder containing this template
 
-* set the options for filtering, saving etc. in the chunk below  
+-   [create a RStudio project](https://support.rstudio.com/hc/en-us/articles/200526207-Using-RStudio-Projects) for that folder. 
 
-* knit the document (the default is to .html, but you can change the YAML header (or choose the appropriate option in the Knit menu) to obtain .pdf (need LaTex) or MS Word documents  
+-   set the options for filtering, saving etc. in the chunk below (lines 87-214)
 
-Any graph will be saved in the same folder. A few chunks have the include oprion set to FALSE: this mean that their output will not be included. You can change this by setting `include = T`.   
-Knowledge of [Rmarkdown](https://rmarkdown.rstudio.com/docs/articles/rmarkdown.html) and a rudimentary knowledge of R is useful but not essential.  
-__Please note__ a few graphs may not print correctly in the report. To adjust this you need to fiddle with the code. If you are not knowledgeable with the specific functions being used don't do that; in general the graphs will be saved correctly. As a general piece of advice: avoid putting too many things in a graph.  
+-   knit the document (the default is to .html, but you can change the YAML header (or choose the appropriate option in the Knit menu) to obtain .pdf (need LaTex) or MS Word documents  
 
-## Known issues.  
+-   have a look, then change title, subtitle, author (lines 1-10) and/or any comment to the analysis (the text parts of this document, not the R chunks). 
+
+Any graph will be saved in the project folder. A few chunks have the include option set to FALSE: this means that their output will not be included. You can change this by setting `include = T`.
+Knowledge of [Rmarkdown](https://rmarkdown.rstudio.com/docs/articles/rmarkdown.html) and a rudimentary knowledge of R is useful but not essential.
+**Please note** a few graphs may not print correctly in the report. To adjust this you need to fiddle with the code. If you are not knowledgeable with the specific functions being used don't do that; in general the graphs will be saved correctly. As a general piece of advice: avoid putting too many things in a graph.
+
+## Known issues.
 
 The document should knit without problems if you hit the Knit icon in RStudio. You may see some warnings (some are more frequent if your projects are on a remote drive in MacOS, i.e. Google drive):
 
-*  cleaning the working environment or restarting R before running this script may prevent some problems.
+-   cleaning the working environment or restarting R before running this script may prevent some problems.
 
-*  if you see a warning that .png graphs cannot be saved this might be due to the fact that you have the file in a folder syncing with Google Drive. The issue disappears when you move everything to your local drive or use Dropbox  
+-   if you see a warning that .png graphs cannot be saved this might be due to the fact that you have the file in a folder syncing with Google Drive. The issue disappears when you move everything to your local drive or use Dropbox
 
-*  some graphs are generated using random palettes rather than brewer's palettes (which are nicer). If you don't like the colors try starting a new RStudio session and knitting again (or using a lower number of samples/sample groups or selecting more stringent parameters for the selection of taxa, which is also wiser.)  
+-   some graphs are generated using random palettes rather than brewer's palettes (which are nicer). If you don't like the colors try starting a new RStudio session and knitting again (or using a lower number of samples/sample groups or selecting more stringent parameters for the selection of taxa, which is also wiser.)
 
-*  some calculations are slow and memory + CPU intensive: this is especially true for rarefaction analysis, calculation of networks stats and module inference. Please be patient (or select a more manageable number of sample/sample groups and taxa); in fact, it might be difficult to run the whole analysis with 8 Gb RAM. In addition, if you choose .tiff as a graph output format and select a high value for graph resolution, the graphic output can be pretty large in terms of disk space (and further slow the execution).    
+-   some calculations are slow and memory + CPU intensive: this is especially true for rarefaction analysis, calculation of networks stats and module inference. Please be patient (or select a more manageable number of sample/sample groups and taxa); in fact, it might be difficult to run the whole analysis with 8 Gb RAM. In addition, if you choose .tiff as a graph output format and select a high value for graph resolution, the graphic output can be pretty large in terms of disk space (and further slow the execution).
 
-*  if you re-run the document graphs and tables will be overwritten.  
+-   if you re-run the document graphs and tables will be overwritten.
 
-There are two other options you can consider as an alternative to saving _aggdata in the Shiny app and using this document to generate a report:  
+There are two other options you can consider as an alternative to saving \_aggdata in the Shiny app and using this document to generate a report:
 
-*  save a [phyloseq](https://joey711.github.io/phyloseq/) file and use it in your own script: this is usually more flexible, because phyloseq functions are much more powerful than those used here. If you are not familiar with the phyloseq package you can try the phyloseq file with [Shiny Phyloseq](https://joey711.github.io/shiny-phyloseq/), a Shiny app which provides an interactive interface. In addition phyloseq objects are used as an input by many other R packages on microbiome analysis.  
+-   save a [phyloseq](https://joey711.github.io/phyloseq/) file and use it in your own script: this is usually more flexible, because phyloseq functions are much more powerful than those used here. If you are not familiar with the phyloseq package you can try the phyloseq file with [Shiny Phyloseq](https://joey711.github.io/shiny-phyloseq/), a Shiny app which provides an interactive interface. In addition phyloseq objects are used as an input by many other R packages on microbiome analysis.
 
-*  save data in a format usable with [MicrobiomeAnalyst](http://microbiomeanalyst.ca), which provides an excellent web interface for graphical and statistical analysis of microbiota data.  
+-   save data in a format usable with [MicrobiomeAnalyst](http://microbiomeanalyst.ca), which provides an excellent web interface for graphical and statistical analysis of microbiota data.
 
-**Please remember**: in FoodMicrobionet during analysis of raw sequences OTUs or ASVs are aggregated in taxa with the same annotation; further aggregation may then be performed during extraction of data with the ShinyFMBN app. IN the code below I am using OTUs rather loosely.   
+**Please remember**: in FoodMicrobionet during analysis of raw sequences OTUs or ASVs are aggregated in taxa with the same annotation; further aggregation may then be performed during extraction of data with the ShinyFMBN app. IN the code below I am using OTUs rather loosely.
 
 ```{r loaddata_setoptions, include=FALSE}
 filelist <- list.files()
@@ -163,11 +168,12 @@ filterOTU_flag <- F
 # samples/sample groups with less than minsampleab sequences will be removed
 minsampleab <- 1000 
 
-# rarefy? if T vegan::rrarefy() will be used to extract a random rarefied
+# rarefy? if rareoption<-T vegan::rrarefy() will be used to extract a random rarefied
 # matrix. If raremin is T will rarefy to the closest hundred below the
 # minimum number of sequences, otherwise will rarefy to raren.
 # The default is F, although rarefaction will be performed for bipartite
 # analysis 
+
 rareoption <- T
 raremin <- T
 raren <- 10000
@@ -196,9 +202,8 @@ topx <- 19
 # logging the color scale in heat maps; set to T if you want the scale
 # in log10(relabundance); set to F if you want to keep a linear scale
 loghmscale <- T
-
 # option for performing rarefaction analysis on the unfiltered matrix
-dorareanalysis <- T
+dorareanalysis <- F
 
 #########1#########2#########3#########4#########5#########6#########7#########8
 # make a qualitative color palette
@@ -207,16 +212,15 @@ rpalette <- distinctColorPalette(n)
 names(rpalette) <- NULL
 #########1#########2#########3#########4#########5#########6#########7#########8
 
-
 ```
 
-The name of the data file used in this report is `r input_file_name`.  
+The name of the data file used in this report is `r input_file_name`.
 
-# Methods.  
+# Methods.
+
 This is a short summary of the data and statistical methods used in this document.  
 `r input_data$version`.  
-The aggregation level for samples is `r input_data$sample_agg` (there are `r nrow(input_data$sample_metadata)` samples/sample groups). 
-Here is the distribution of sample/sample groups by sample type (food or environment)
+The aggregation level for samples is `r input_data$sample_agg` (there are `r nrow(input_data$sample_metadata)` samples/sample groups). Here is the distribution of sample/sample groups by sample type (food or environment).  
 
 ```{r table_s_type}
 table(input_data$sample_metadata$s_type)
@@ -235,38 +239,35 @@ Rarefaction, sample filtering and taxonomic and abundance/prevalence filtering a
 Rarefaction curves are and diversity indices (number of observed "species", Chao1, ACE) calculated using functions of the [vegan package](https://cran.r-project.org/web/packages/vegan/index.html).  
 Bar and box plots for relative taxa abundance, configurations for sample/sample groups and taxa are produced using functions of package [ggplot2](https://ggplot2.tidyverse.org).  
 Enhanced heatmaps (sample/sample groups vs taxa) are produced using functions of the package [gplots](https://cran.r-project.org/web/packages/gplots/index.html). Distance matrix is calculated using the Bray-Curtis distance calculated with functions of the package vegan. Clustering is performed with stats::hclust using the UPGMA method.  
-Non Metric Multidimensional Scaling is performed using functions of the [vegan package](https://cran.r-project.org/web/packages/vegan/index.html). 
-Analysis of food-bacteria networks as bipartite networks is performed using functions of the [bipartite package](https://cran.r-project.org/web/packages/bipartite/vignettes/Intro2bipartite.pdf).
+Non Metric Multidimensional Scaling is performed using functions of the [vegan package](https://cran.r-project.org/web/packages/vegan/index.html). Analysis of food-bacteria networks as bipartite networks is performed using functions of the [bipartite package](https://cran.r-project.org/web/packages/bipartite/vignettes/Intro2bipartite.pdf).
 
+# Preparatory steps.
 
-# Preparatory steps.  
-
-## Taxonomic and prevalence and abundance filtering.  
+## Taxonomic and prevalence and abundance filtering.
 
 A few filtering steps will be performed depending on the options in the previous chunk.  
-A prevalence and abundance plot will be generated and saved as applicable and a prevalence and abundance table of the top 50 OTUs will be saved and optionally printed.    
-Your options for filtering are:  
+A prevalence and abundance plot will be generated and saved as applicable and a prevalence and abundance table of the top 50 OTUs will be saved and optionally printed.  
+Your options for filtering are:
 
-* removeOther `r removeOther`  
+-   removeOther `r removeOther`
 
-* removeKonly `r removeKonly`  
+-   removeKonly `r removeKonly`
 
-* removeChloroplast `removeChloroplast`  
+-   removeChloroplast `removeChloroplast`
 
-* removeMitochondria `r removeMitochondria`  
+-   removeMitochondria `r removeMitochondria`
 
-* removeEukaryota `r removeEukaryota`  
+-   removeEukaryota `r removeEukaryota`
 
-* filtersamples `r filtersamples` (if T samples with <`minsampleab` sequences will be filtered) 
+-   filtersamples `r filtersamples` (if T samples with \<`minsampleab` sequences will be filtered)
 
-* filterOTUs `r filterOTUs` (if T abundance filtering will be performed)  
+-   filterOTUs `r filterOTUs` (if T abundance filtering will be performed)
 
-* abtreshold `r abtreshold`  
+-   abtreshold `r abtreshold`
 
-* prev_filter `r prev_filter` (if T prevalence filtering will be performed)  
+-   prev_filter `r prev_filter` (if T prevalence filtering will be performed)
 
-* prev_treshold `r prev_treshold` (as proportion of samples)  
-
+-   prev_treshold `r prev_treshold` (as proportion of samples)  
 
 ```{r filtering, dpi = 96, echo = F}
 
@@ -445,10 +446,9 @@ The original abundance table has `r ncol(tOTUm)` taxa and `r nrow(tOTUm)` sample
 After filtering there are `r nlevels(sample_metadata$llabel)` llabel groups (these are combinations of FoodEx2 FoodId with further metadata on nature, process and spoilage), `r nlevels(sample_metadata_f$L1)` food groups, `r nlevels(sample_metadata_f$L4)` food subgroups.  
 After filtering/rarefaction you have removed `r filtOTU` OTU out of `r ncol(tOTUm)`.  
 
-## Create a palette for samples.  
+## Create a palette for samples.
 
 Including the palettes for samples in some graphs is awkward and difficult to automate. Palettes will be generated and saved here.  
-
 
 ```{r sample_palette, dpi = 96, include = T, echo=FALSE}
 #########1#########2#########3#########4#########5#########6#########7#########8
@@ -539,27 +539,26 @@ if (savegraph) {
   par(opar)
   dev.off()
 }
-# Clean up (if you want to recreate a palette you have to run 221-306 again)    
+# Clean up   
 rm(foodgpalette, foodsgpalette, ncolfoodg, ncolfoodsg, samplenames)
 ```
 
-# Descriptive plots.  
+# Descriptive plots.
 
-These are a few descriptive plots which are usually shown in scientific papers on food microbiota.  
-You should not overinterpret them.
+These are a few descriptive plots which are usually shown in scientific papers on food microbiota.\
+You should not overinterpret them.  
 
-## Rarefaction.  
+## Rarefaction.
 
-Rarefaction is optionally performed using the following options: 
+Rarefaction is optionally performed using the following options:  
 
-* rareoption `r rareoption`  (if T perform rarefaction)
+-   rareoption `r rareoption` (if T perform rarefaction)  
 
-* raremin `r raremin` (if raremin is T will rarefy to the closest hundred below the
-minimum number of sequences, otherwise will rarefy to raren)  
+-   raremin `r raremin` (if raremin is T will rarefy to the closest hundred below the minimum number of sequences, otherwise will rarefy to raren)  
 
-* raren `r raren`  
+-   raren `r raren`  
 
-* dorareanalysis `r dorareanalysis` (if T  rarefation analysis and calculation of diversity indices is performed)
+-   dorareanalysis `r dorareanalysis` (if T rarefation analysis and calculation of diversity indices is performed)  
 
 This module also performs calculation of diversity indices and **may take very long** for large number of samples/sample groups.  
 
@@ -593,10 +592,9 @@ if (dorareanalysis){
 
 ```
 
+## Bar plots.
 
-## Bar plots.  
-
-This module generates bar plots at the genus, family and class level using rel. frequencies before filtering/rarefaction (if any). The plots are generated only if the number of categories is <=maxOTUcats. Note: this section will attempt to use a color brewer qualitative palette if the number of categories for the taxonomic level are <=12, otherwise it will use a default palette and difference in colors may be difficult to perceive.        
+This module generates bar plots at the genus, family and class level using rel. frequencies before filtering/rarefaction (if any). The plots are generated only if the number of categories is \<=maxOTUcats. Note: this section will attempt to use a color brewer qualitative palette if the number of categories for the taxonomic level are \<=12, otherwise it will use a default palette and difference in colors may be difficult to perceive.  
 
 ```{r bar_plots, dpi = 96, echo = FALSE}
 
@@ -770,10 +768,9 @@ if (savegraph) {
 
 ```
 
-## Box plots.  
+## Box plots.
 
-This module plots and saves box plots for the distribution of the 25 most abundant and prevalent taxa (genus, family or class, depending of taxonomic aggregation in the input file).
-Beware: if you aggregate at the llabel (exp.code), L1, L4 or L6 level, depending on your selections of samples you may be aggregating samples with very different characteristics. Therefore: choose wisely your subset of samples in ShinyFMBN.  
+This module plots and saves box plots for the distribution of the 25 most abundant and prevalent taxa (genus, family or class, depending of taxonomic aggregation in the input file). Beware: if you aggregate at the llabel (exp.code), L1, L4 or L6 level, depending on your selections of samples you may be aggregating samples with very different characteristics. Therefore: choose wisely your subset of samples in ShinyFMBN.  
 
 ```{r box_plots, dpi = 96, echo = F}
 
@@ -830,7 +827,7 @@ ggsave(filename = str_c(file_name_prefix, "bxp","topntaxa",gfileext),
 ## Heat maps.
 
 This module creates a heat map with dendrograms (Bray-Curtis is used as a distance and UPGMA for agglomeration) for both samples and taxa. With many taxa and samples/sample groups the output might not plot very well.  
-  
+
 The aggregation level for taxa is `r input_data$tax_agg`.  
 There are `r ncol(OTUmatrixf)` taxa in this set. Only `r topn` will be used in the analysis.  
 
@@ -851,8 +848,8 @@ if (any(colnames(OTUmatrixf_relab_hm) == "Other")){
 }
 
 # Create palette for OTUs. See above for instructions to override defaults
-# this should be transformed into a function
-ET3 <- taxa_metadata_f %>%
+
+ET3 <- input_data$taxa_metadata %>%
   dplyr::filter(label %in% colnames(OTUmatrixf_relab_hm))
 # must fill the NAs with info from higher taxa
 ET3 <- ET3 %>% 
@@ -941,7 +938,7 @@ if (savegraph) {
 }
 ```
 
-Now I am going to create a heatmap. You can change the way the abundance scale is shown (log sequences or number of sequences) in the options chunk.
+Now I am going to create a heatmap. You can change the way the abundance scale is shown (log sequences or number of sequences) in the options chunk.  
 
 ```{r heatmap_2, dpi = 96, echo =F}
 # calculate distance matrices and dendrograms
@@ -1022,9 +1019,9 @@ par(opar)
 
 ```
 
-## Multidimentional scaling with Vegan.  
+## Multidimensional scaling with Vegan.
 
-This module performs Multidimensional Scaling on the filtered data. The graphs which are produced depend on the verbose_output option.  With high number of taxa and sample/sample groups the graphs can be difficult to interpret. Filter wisely!
+This module performs Multidimensional Scaling on the filtered data. The graphs which are produced depend on the verbose_output option. With high number of taxa and sample/sample groups the graphs can be difficult to interpret. Filter wisely!  
 
 ```{r NMDS, echo = F, dpi = 96}
 # NMDS with vegan package using Bray-Curtis distance as default
@@ -1034,7 +1031,8 @@ This module performs Multidimensional Scaling on the filtered data. The graphs w
 # filtering OTUmatrixf (removing samples)
 
 samples_2_keep <- which(row.names(OTUmatrixf) %in% groupcolors$label)
-MDSall <- metaMDS(OTUmatrixf[samples_2_keep,colnames(OTUmatrixf_relab_hm)], trymax = 50)
+MDSmatrix <- tOTUm[samples_2_keep,colnames(OTUmatrixf_relab_hm)]
+MDSall <- metaMDS(MDSmatrix, trymax = 50)
 MDSall
 stressplot(MDSall)
 plot(MDSall, type = "t")
@@ -1176,16 +1174,14 @@ if (savegraph) {
 }
 ```
 
+# Bipartite analysis.
 
+This group of chunks performs a few statistical and graphical analyses which are appropriate for bipartite networks. Most of these were developed for pollinator networks, but I think that module node degree distribution, nodule detection and calculation of node and network indices may be interesting for the characterization of food-bacteria networks.  
+**The analysis is only performed if the aggregation level of the samples is exp. code (i.e. samples are aggregated before saving with a combination of food code, nature, treatment, spoilage/fermentation and gene target fields; check the specifications for FoodMicrobionet tables to learn more)**.  
 
-# Bipartite analysis.  
+## Degree distribution.
 
-This group of chunks performs a few statistical and graphical analyses which are appropriate for bipartite networks. Most of these were developed for pollinator networks, but I think that module node degree distribution, nodule detection and calculation of node and network indices may be interesting for the characterization of food-bacteria networks. The analysis is only performed  if the aggregation level of the samples is exp. code (i.e. samples are aggregated before saving with a combination of food code, nature, treatment, spoilage/fermentation and gene target fields; check the specifications for FoodMicrobionet tables to learn more).
-
-## Degree distribution.  
-
-Degree distribution for both upper (taxa) and lower (food groups) level may give an idea on the occurrence of scale-free, small world networks (power degree or truncated power degree distribution), in which a few nodes (hubs) have a high degree (occur in several foods for taxa, are colonized by a large number of different taxa for food samples) rather than a Poisson distribution which is characteristic of random graphs.
-Degree distirbution is first calculated for the whole dataset (only Chloroplasts and Mitochondia are removed) and then after abundance and prevalence filtering.  
+Degree distribution for both upper (taxa) and lower (food groups) level may give an idea on the occurrence of scale-free, small world networks (power degree or truncated power degree distribution), in which a few nodes (hubs) have a high degree (occur in several foods for taxa, are colonized by a large number of different taxa for food samples) rather than a Poisson distribution which is characteristic of random graphs. Degree distirbution is first calculated for the whole dataset (only Chloroplasts and Mitochondia are removed) and then after abundance and prevalence filtering.  
 **Warning**: some steps are slow and memory and cpu intensive, be patient.  
 
 ```{r degree_distr_all, dpi = 96, echo = F}
@@ -1207,7 +1203,7 @@ if(input_data$sample_agg == "exp. code"){
 
 ```
 
-## Filtering, palettes.  
+## Filtering, palettes.
 
 Further preliminary filtering (abundance only) and rarefaction (so that all sample groups have the same number of sequences) steps are performed and the palettes are generated ex novo.  
 
@@ -1340,7 +1336,7 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-## Plot the filtered network.  
+## Plot the filtered network.
 
 The bipartite network is plotted: adjusting the graph parameters is tricky and very difficult to automate, but the saved graph should be fine. However, avoid using too many taxa and samples/sample groups.  
 
@@ -1408,10 +1404,9 @@ if(input_data$sample_agg == "exp. code"){
 gc()
 ```
 
+## Calculate diversity indices for the whole network.
 
-## Calculate diversity indices for the whole network.  
-
-Calculate H2' for the network (the higher the value the more selective the OTUs) and d' (same for samples, ranges from 0, no specialization, to 1, perfect specialist). d' for OTUs is calculated later.
+Calculate H2' for the network (the higher the value the more selective the OTUs) and d' (same for samples, ranges from 0, no specialization, to 1, perfect specialist). d' for OTUs is calculated later.  
 
 ```{r div_network, dpi = 96, echo = F}
 if(input_data$sample_agg == "exp. code"){
@@ -1425,7 +1420,7 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-## Calculate taxa and sample statistics.  
+## Calculate taxa and sample statistics.
 
 A number of statistics are useful in the characterization for nodes of both levels (OTUs, samples). For their interpretation refer to this [vignette](https://cran.r-project.org/web/packages/bipartite/vignettes/Intro2bipartite.pdf) and to papers on the bipartite package and on pollination networks in general.  
 A few plots are also generated: they are supposed to make it easier to identify specialist or generalist taxa.  
@@ -1526,10 +1521,9 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-## Degree distribution, filtered network.  
+## Degree distribution, filtered network.
 
 The degree distribution is recalculated and plotted for the filtered network.  
-
 
 ```{r deg_dist_filtered, dpi = 96, echo = F}
 if(input_data$sample_agg == "exp. code"){
@@ -1546,8 +1540,7 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-
-## Calculate modules.  
+## Calculate modules.
 
 This chunk identifies modules of highly connected nodes and may be useful to identify sample groups specific microbiota.  
 The output is rather tricky and may be difficult to plot if there are too many taxa and sample groups.  
@@ -1578,10 +1571,10 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-## Network level stats.  
+## Network level stats.
 
 This are useful if you want to compare different networks. Again, refer to the documentation for the bipartite package for interpretation.  
-The stats are saved and printed (depending on the verbose_output option).
+The stats are saved and printed (depending on the verbose_output option).  
 
 ```{r net_level_stats, dpi = 96, echo = F}
 if(input_data$sample_agg == "exp. code"){
@@ -1613,70 +1606,72 @@ if(input_data$sample_agg == "exp. code"){
 }
 ```
 
-# A bonus bar plot.  
+# A bonus bar plot.
 
-I am including this just because I like it a lot, but it may really oversimplify the structure of the microbial community. The relative abundance for the top x (set in options) taxa is plotted; all the other taxa are pooled under Other.
+This plot is only generated if sample aggregation is exp. code, otherwise it has no meaning. I am including this just because I like it a lot, but it may really oversimplify the structure of the microbial community. The relative abundance for the top x (set in options) taxa is plotted; all the other taxa are pooled under Other.  
 
 ```{r bonus_plot, dpi = 96, echo = F}
-OTUsums <- colSums(OTUmatrixbip)
-# topx should be <20 and definitely <25
-topxOTUnodesab <- names(OTUsums[order(OTUsums, decreasing = TRUE)])[1:topx]
-OTUmatrixf3 <- OTUmatrixbip[,which(colnames(OTUmatrixbip) %in% topxOTUnodesab)]
-if (pool) {
-  if (rarefy_flag){
-    sampleSums <- round(rarennbip*(totseqs-totseqsbip)/totseqs,0)+rarennbip
-  } else {sampleSums <- totseqs}
-} else {
-  sampleSums <- rowSums(OTUmatrixbip)
-}
-OTUmatrixf3 <- OTUmatrixf3/sampleSums
-Other <- 1-rowSums(OTUmatrixf3)
-OTUmatrixf3 <- cbind(OTUmatrixf3, Other)
 
-ET5 <- melt(OTUmatrixf3, value.name = "Weight")
-colnames(ET5)[1:2] <- c("Sample", "Taxa")
-taxa_levels <- unique(ET5$Taxa)
-if ("Other" %in% taxa_levels) {
-  taxa_levels <- c("Other",setdiff(taxa_levels,"Other"))
-}
-ET5$Taxa <- factor(ET5$Taxa, levels = taxa_levels) 
-# make a palette
-ncols <- nlevels(ET5$Taxa)
-# make a qualitative color palette
-bp_palette <- distinctColorPalette(ncols)
-names(bp_palette) <- levels(ET5$OTU)
-mygtitle <- paste("Relative abundance, top", ncols, "taxa (based on tot seqs)")
-
-sbplot <- ggplot(data = ET5, aes(x = Sample, y= Weight, fill = Taxa))
-if (topx<=12) {
-  sbplot + geom_col(position = "fill") + 
-    labs(title = str_wrap(mygtitle,40),
-         x= "Samples/Sample groups",
-         y= "Relative abundance",
-         fill = "taxa") +
-    scale_fill_brewer(type = "qual", palette = "Paired") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
-          panel.background= element_rect(fill = "white"),
-          legend.key.size = unit(0.2, "in"),
-          plot.title = element_text(hjust = 0.5))
-} else {
-  sbplot + geom_col(position = "fill") + 
-    labs(title = str_wrap(mygtitle,40),
-         x= "Samples/Sample groups",
-         y= "Relative abundance",
-         fill = "taxa") +
-    scale_fill_manual(values = bp_palette) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-          panel.background= element_rect(fill = "white"),
-          legend.key.size = unit(0.2, "in"),
-          plot.title = element_text(hjust = 0.5))
-}
-if (savegraph) {
-  ggsave(str_c(file_name_prefix, "_topxab", gfileext), 
-         width = 7, height = 5, dpi = graphresolution)
+if(input_data$sample_agg == "exp. code" & input_data$tax_agg == "genus"){
+  OTUsums <- colSums(OTUmatrixbip)
+  # topx should be <20 and definitely <25
+  topxOTUnodesab <- names(OTUsums[order(OTUsums, decreasing = TRUE)])[1:topx]
+  OTUmatrixf3 <- OTUmatrixbip[,which(colnames(OTUmatrixbip) %in% topxOTUnodesab)]
+  if (pool) {
+    if (rarefy_flag){
+      sampleSums <- round(rarennbip*(totseqs-totseqsbip)/totseqs,0)+rarennbip
+    } else {sampleSums <- totseqs}
+  } else {
+    sampleSums <- rowSums(OTUmatrixbip)
+  }
+  OTUmatrixf3 <- OTUmatrixf3/sampleSums
+  Other <- 1-rowSums(OTUmatrixf3)
+  OTUmatrixf3 <- cbind(OTUmatrixf3, Other)
+  
+  ET5 <- melt(OTUmatrixf3, value.name = "Weight")
+  colnames(ET5)[1:2] <- c("Sample", "Taxa")
+  taxa_levels <- unique(ET5$Taxa)
+  if ("Other" %in% taxa_levels) {
+    taxa_levels <- c("Other",setdiff(taxa_levels,"Other"))
+  }
+  ET5$Taxa <- factor(ET5$Taxa, levels = taxa_levels) 
+  # make a palette
+  ncols <- nlevels(ET5$Taxa)
+  # make a qualitative color palette
+  bp_palette <- distinctColorPalette(ncols)
+  names(bp_palette) <- levels(ET5$OTU)
+  mygtitle <- paste("Relative abundance, top", ncols, "taxa (based on tot seqs)")
+  
+  sbplot <- ggplot(data = ET5, aes(x = Sample, y= Weight, fill = Taxa))
+  if (topx<=12) {
+    sbplot <- sbplot + geom_col(position = "fill") + 
+      labs(title = str_wrap(mygtitle,40),
+           x= "Samples/Sample groups",
+           y= "Relative abundance",
+           fill = "taxa") +
+      scale_fill_brewer(type = "qual", palette = "Paired") +
+      theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+            legend.key.size = unit(0.2, "in"),
+            plot.title = element_text(hjust = 0.5))
+    print(sbplot)
+  } else {
+    sbplot <- sbplot + geom_col(position = "fill") + 
+      labs(title = str_wrap(mygtitle,40),
+           x= "Samples/Sample groups",
+           y= "Relative abundance",
+           fill = "taxa") +
+      scale_fill_manual(values = bp_palette) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+            legend.key.size = unit(0.2, "in"),
+            plot.title = element_text(hjust = 0.5))
+    print(sbplot)
+  }
+  if (savegraph) {
+    ggsave(str_c(file_name_prefix, "_topxab", gfileext), 
+           width = 7, height = 5, dpi = graphresolution)
+  }
 }
 ```
-
 
 # Citations and references.
 
@@ -1684,20 +1679,19 @@ if (savegraph) {
 
 Here is a list of references for FoodMicrobionet papers and for papers whose data were used for this data set. Be aware that:  
 
-*  if the aggregation level for samples was "samples" a given subset of samples can be always by uniquely attributed to a given paper;  
+-   if the aggregation level for samples was "samples" a given subset of samples can be always by uniquely attributed to a given paper;  
 
-*  if the aggregation level was "exp. code" then samples from different studies may be aggregated under the same "exp. code" category.
+-   if the aggregation level was "exp. code" then samples from different studies may be aggregated under the same "exp. code" category.  
 
 ```{r citations_1, echo = F}
 kable(input_data$references, col.names = c("Study", "Reference", "DOI"))
 ```
 
-
-## Citations for R packages used in this script.  
+## Citations for R packages used in this script.
 
 The data used in this report were extracted from FoodMicrobionet using the ShinyFMBN app.  
 
-`r input_data$version`  
+`r input_data$version`
 
 ```{r citations_packages}
 
@@ -1709,18 +1703,15 @@ map(all_packages, citation)
 
 ```
 
-## Copyright notice.  
+## Copyright notice.
 
-v2.2 9/1/2022
-This .Rmd file was created by Eugenio Parente, Università degli Studi della Basilicata.  
+v2.3 9/2/2022 This .Rmd file was created by Eugenio Parente, Università degli Studi della Basilicata.
 The checkpackages function is derived from [this post](http://tinyurl.com/jjwyzph).  
 The code for making qualitative palette is derived from [this article](http://tinyurl.com/hawqufy).  
 The code for heat maps is modified from an article on the [Molecular ecologist blog](http://tinyurl.com/hxxbmvz).  
-**The code is under [MIT](https://opensource.org/licenses/MIT) license**
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+**The code is under [MIT](https://opensource.org/licenses/MIT) license** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
 
-**Text and examples are under [CC BY-ND 4.0 international](https://creativecommons.org/licenses/by-nd/4.0/) licence**
+**Text and examples are under [CC BY-ND 4.0 international](https://creativecommons.org/licenses/by-nd/4.0/) licence**  
 
-
-_Finis. Pro bono, malum_ 
+*Finis. Pro bono, malum*  

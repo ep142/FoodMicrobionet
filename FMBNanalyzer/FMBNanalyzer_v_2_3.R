@@ -1,4 +1,4 @@
-# FMBN analyzer v2.2 beta
+# FMBN analyzer v2.3 beta
 
 # performs graphical and numerical analysis of FMBN data generated with the
 # ShinyFMBN app
@@ -124,6 +124,10 @@ minsampleab <- 1000
 # minimum number of sequences, otherwise will rarefy to raren.
 # The default is F, although rarefaction will be performed for bipartite
 # analysis 
+
+# option for performing rarefaction analysis on the unfiltered matrix
+dorareanalysis <- F
+
 rareoption <- T
 raremin <- T
 raren <- 10000
@@ -154,8 +158,6 @@ max_samples <- 25
 # in log10(relabundance); set to F if you want to keep a linear scale
 loghmscale <- T
 
-# option for performing rarefaction analysis on the unfiltered matrix
-dorareanalysis <- F
 
 #########1#########2#########3#########4#########5#########6#########7#########8
 # make a qualitative color palette
@@ -699,7 +701,7 @@ if (any(colnames(OTUmatrixf_relab_hm) == "Other")){
 
 # Create palette for OTUs. See above for instructions to override defaults
 # this should be transformed into a function
-ET3 <- taxa_metadata_f %>%
+ET3 <- input_data$taxa_metadata %>%
   dplyr::filter(label %in% colnames(OTUmatrixf_relab_hm))
 # must fill the NAs with info from higher taxa
 ET3 <- ET3 %>% 
@@ -876,7 +878,8 @@ par(opar)
 # filtering OTUmatrixf (removing samples)
 
 samples_2_keep <- which(row.names(OTUmatrixf) %in% groupcolors$label)
-MDSall <- metaMDS(OTUmatrixf[samples_2_keep,colnames(OTUmatrixf_relab_hm)], trymax = 50)
+MDSmatrix <- tOTUm[samples_2_keep,colnames(OTUmatrixf_relab_hm)]
+MDSall <- metaMDS(MDSmatrix, trymax = 50)
 MDSall
 stressplot(MDSall)
 plot(MDSall, type = "t")
@@ -1397,68 +1400,69 @@ if(input_data$sample_agg == "exp. code"){
 #########1#########2#########3#########4#########5#########6#########7#########8
 # Bonus plot --------------------------------------------------------------
 # bar plot with the x taxa with the highest absolute abundance.                #
-# skipped if aggregation level is other than genus                             #
+# skipped if aggregation level is other than genus or sample aggregation is    #
+# other than exp.code.
 # The abundances of the remaining OTUs are optionally pooled.                  #                                                                       #
 #########1#########2#########3#########4#########5#########6#########7#########8
-OTUsums <- colSums(OTUmatrixbip)
-# topx should be <20 and definitely <25
-topxOTUnodesab <- names(OTUsums[order(OTUsums, decreasing = TRUE)])[1:topx]
-OTUmatrixf3 <- OTUmatrixbip[,which(colnames(OTUmatrixbip) %in% topxOTUnodesab)]
-if (pool) {
-  if (rarefy_flag){
-    sampleSums <- round(rarennbip*(totseqs-totseqsbip)/totseqs,0)+rarennbip
-  } else {sampleSums <- totseqs}
-} else {
-  sampleSums <- rowSums(OTUmatrixbip)
+if(input_data$sample_agg == "exp. code" & input_data$tax_agg == "genus"){
+  OTUsums <- colSums(OTUmatrixbip)
+  # topx should be <20 and definitely <25
+  topxOTUnodesab <- names(OTUsums[order(OTUsums, decreasing = TRUE)])[1:topx]
+  OTUmatrixf3 <- OTUmatrixbip[,which(colnames(OTUmatrixbip) %in% topxOTUnodesab)]
+  if (pool) {
+    if (rarefy_flag){
+      sampleSums <- round(rarennbip*(totseqs-totseqsbip)/totseqs,0)+rarennbip
+    } else {sampleSums <- totseqs}
+  } else {
+    sampleSums <- rowSums(OTUmatrixbip)
+  }
+  OTUmatrixf3 <- OTUmatrixf3/sampleSums
+  Other <- 1-rowSums(OTUmatrixf3)
+  OTUmatrixf3 <- cbind(OTUmatrixf3, Other)
+  
+  ET5 <- melt(OTUmatrixf3, value.name = "Weight")
+  colnames(ET5)[1:2] <- c("Sample", "Taxa")
+  taxa_levels <- unique(ET5$Taxa)
+  if ("Other" %in% taxa_levels) {
+    taxa_levels <- c("Other",setdiff(taxa_levels,"Other"))
+  }
+  ET5$Taxa <- factor(ET5$Taxa, levels = taxa_levels) 
+  # make a palette
+  ncols <- nlevels(ET5$Taxa)
+  # make a qualitative color palette
+  bp_palette <- distinctColorPalette(ncols)
+  names(bp_palette) <- levels(ET5$OTU)
+  mygtitle <- paste("Relative abundance, top", ncols, "taxa (based on tot seqs)")
+  
+  sbplot <- ggplot(data = ET5, aes(x = Sample, y= Weight, fill = Taxa))
+  if (topx<=12) {
+    sbplot <- sbplot + geom_col(position = "fill") + 
+      labs(title = str_wrap(mygtitle,40),
+           x= "Samples/Sample groups",
+           y= "Relative abundance",
+           fill = "taxa") +
+      scale_fill_brewer(type = "qual", palette = "Paired") +
+      theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+            legend.key.size = unit(0.2, "in"),
+            plot.title = element_text(hjust = 0.5))
+    print(sbplot)
+  } else {
+    sbplot <- sbplot + geom_col(position = "fill") + 
+      labs(title = str_wrap(mygtitle,40),
+           x= "Samples/Sample groups",
+           y= "Relative abundance",
+           fill = "taxa") +
+      scale_fill_manual(values = bp_palette) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+            legend.key.size = unit(0.2, "in"),
+            plot.title = element_text(hjust = 0.5))
+    print(sbplot)
+  }
+  if (savegraph) {
+    ggsave(str_c(file_name_prefix, "_topxab", gfileext), 
+           width = 7, height = 5, dpi = graphresolution)
+  }
 }
-OTUmatrixf3 <- OTUmatrixf3/sampleSums
-Other <- 1-rowSums(OTUmatrixf3)
-OTUmatrixf3 <- cbind(OTUmatrixf3, Other)
-
-ET5 <- melt(OTUmatrixf3, value.name = "Weight")
-colnames(ET5)[1:2] <- c("Sample", "Taxa")
-taxa_levels <- unique(ET5$Taxa)
-if ("Other" %in% taxa_levels) {
-  taxa_levels <- c("Other",setdiff(taxa_levels,"Other"))
-}
-ET5$Taxa <- factor(ET5$Taxa, levels = taxa_levels) 
-# make a palette
-ncols <- nlevels(ET5$Taxa)
-# make a qualitative color palette
-bp_palette <- distinctColorPalette(ncols)
-names(bp_palette) <- levels(ET5$OTU)
-mygtitle <- paste("Relative abundance, top", ncols, "taxa (based on tot seqs)")
-
-sbplot <- ggplot(data = ET5, aes(x = Sample, y= Weight, fill = Taxa))
-if (topx<=12) {
-  sbplot + geom_col(position = "fill") + 
-    labs(title = str_wrap(mygtitle,40),
-         x= "Samples/Sample groups",
-         y= "Relative abundance",
-         fill = "taxa") +
-    scale_fill_brewer(type = "qual", palette = "Paired") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
-          panel.background= element_rect(fill = "white"),
-          legend.key.size = unit(0.2, "in"),
-          plot.title = element_text(hjust = 0.5))
-} else {
-  sbplot + geom_col(position = "fill") + 
-    labs(title = str_wrap(mygtitle,40),
-         x= "Samples/Sample groups",
-         y= "Relative abundance",
-         fill = "taxa") +
-    scale_fill_manual(values = bp_palette) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-          panel.background= element_rect(fill = "white"),
-          legend.key.size = unit(0.2, "in"),
-          plot.title = element_text(hjust = 0.5))
-}
-if (savegraph) {
-  ggsave(str_c(file_name_prefix, "_topxab", gfileext), 
-         width = 7, height = 5, dpi = graphresolution)
-}
-
-
 
 
 #########1#########2#########3#########4#########5#########6#########7#########8
