@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_1_3, 22/11/2021
+# DADA2/Bioconductor pipeline, modified, v6_1_6, 17/02/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -31,8 +31,7 @@
 
 # Install/load packages ---------------------------------------------------
 
-.cran_packages <- c("tidyverse", "parallel","gridExtra", "knitr", "stringr", 
-                    "phylotools", "beepr", "tictoc")
+.cran_packages <- c("tidyverse", "parallel", "beepr", "tictoc")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "DECIPHER", "phangorn", 
                     "BiocStyle", "ShortRead")
 
@@ -57,12 +56,10 @@ sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
 # the following command detects the number of cores on UNIX/MacOS
 nc <- parallel::detectCores(logical = F) # to detect physical cores in MacOS
 set.seed(100)
-R.Version() # in the future may me check that the version running is compatible
+# mainly for reproducibility reasons (this will be saved with the workspace)
+r_version <- R.Version() # in the future may be check that the version running is compatible
 # with the script (it only matters if somebody other than myself is using the script)
-sessionInfo()
-
-# opts_chunk$set(cache = FALSE,fig.path="dadafigure/")
-# read_chunk(file.path("src", "bioinformatics.R"))
+session_info <- sessionInfo()
 
 # other setup operations
 opar <- par(no.readonly=TRUE) 
@@ -163,6 +160,24 @@ if(use_accn_list) {
   fnFs <- fnFs[seq_to_process]
   if(paired_end) fnRs <- fnRs[seq_to_process]
   sample.names <- sample.names[seq_to_process]
+}
+
+# do an early check for sequences and metadata
+
+# path to the metadata file (needs to be adapted)
+metadata_path <- file.path("data", "metadata", "SraRunTable.txt.csv") 
+# alternatives when using data downloades from NCBI SRA are:
+# "data/metadata/SraRunInfo.txt" 
+# "data/metadata/SraRunTable.txt.csv"
+# "data/metadata/SraRunTable.txt"
+samdf <- read_tsv(metadata_path) 
+if(ncol(samdf)==1) samdf <- read_csv(metadata_path)
+if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
+
+if(all(sample.names %in% samdf$Run)){
+  cat("\nsamples in fastq files match samples in metadata\n")
+} else {
+  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
 }
 
 if(keep_time) tic("\nReading sequences")
@@ -323,19 +338,20 @@ if(play_audio) beep(sound = 6)
 
 write_tsv(filter_and_trim_par, "filtertrimpars_conc.txt")
 
-cat("After filtering there are between", 
+cat("After filtering there are between ", 
     minseq_left, 
-    "and", 
+    " and ", 
     maxseq_left, 
-    "(median", 
+    " (median ", 
     medseq_left, 
-    ") sequences left. The fraction of remaining sequences after filtering is between", 
+    ") sequences left. The fraction of remaining sequences after filtering is between ", 
     round(minfracloss, 2), 
-    "and", 
+    " and ", 
     round(maxfracloss, 2), 
-    "(median", 
+    " (median ", 
     round(medfracloss, 2),
-    ")\n"
+    ")\n",
+    sep=""
     )
 
 
@@ -475,8 +491,8 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) tic("\nremove bimeras")
 # may be very slow for large studies, you may want to check with a shorter version
 # seqtab.nochim <- removeBimeraDenovo(seqtab_f[,1:10000])
-cat("\nsequences prior to bimera removal\n")
-dim(seqtab_f)
+cat("\nThe number of sequences prior to bimera removal is:", dim(seqtab_f)[2],"\n")
+
 seqtab.nochim <- removeBimeraDenovo(seqtab_f, method="consensus", 
                                     multithread=TRUE, verbose=TRUE)
 beep(sound=6)
@@ -503,7 +519,7 @@ seqtab.nochim.all <- seqtab.nochim
 if(remove_s_d){
   seqtab.nochim <- seqtab.nochim[,-single_double]
 }
-cat("The sequences after bimera removal are: ", dim(seqtab.nochim), "\n")
+cat("The number of sequences after bimera removal is:", dim(seqtab.nochim)[2], "\n")
 
 # check the distribution of removals
 summary(rowSums(seqtab.nochim)/rowSums(seqtab_f))
@@ -728,7 +744,6 @@ if (dotree) {
   seqs <-
     dada2::getSequences(seqtab.nochim) # the collapse option is very interesting
   names(seqs) <- seqs # This propagates to the tip labels of the tree
-  # run alignment from the decipher package 11:47 end 11:48
   alignment <-
     DECIPHER::AlignSeqs(DNAStringSet(seqs),
                         anchor = NA,
@@ -769,16 +784,6 @@ beep(sound = 6)
 save.image(file = str_c(Study,"_small.Rdata"))
 
 # Combine data into a phyloseq object -------------------------------------
-
-# path to the metadata file (needs to be adapted)
-metadata_path <- file.path("data", "metadata", "SraRunTable.txt.csv") 
-# alternatives when using data downloades from NCBI SRA are:
-# "data/metadata/SraRunInfo.txt" 
-# "data/metadata/SraRunTable.txt.csv"
-# "data/metadata/SraRunTable.txt"
-samdf <- read_tsv(metadata_path) 
-if(ncol(samdf)==1) samdf <- read_csv(metadata_path)
-if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
 # check if any cols in seqtab have 0 sums
 seq_sums <- rowSums(seqtab.nochim)
@@ -850,7 +855,10 @@ if(is_null(seq_center)) seq_center <- unique(samples$Center.Name)
 read_length <- round(mean(nchar(rownames(ttab)), na.rm = T)) 
 
 # adapt this or sett manually a comma delimited string of countries.
-loc_list <- str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =",")
+# adapt this or set manually a comma delimited string of countries.
+loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
+                    str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =","),
+                    NA_character_)
 
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
@@ -868,9 +876,12 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c(Isolation_source, Sample.Name, sep =", "))
+  mutate(description = str_c("Water-buffalo mozzarella", SampleName, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
+samples$geo_loc_name_country <- NA_character_
+samples$geo_loc_name_country_continent <- NA_character_
+samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
@@ -1037,12 +1048,14 @@ if(all(check_list)){
   cat("\nAll needed objects available and ready to process\n")
   saveRDS(mylist, file = str_c(Study, "_mindata.RDS"))
 } else {
-  cat("One or more of the objects you need is missing, check your data before proceeding\n")
+  cat("\nOne or more of the objects you need is missing, check your data before proceeding\n")
 }
 
 
-cat("\nSaved data for ",Study,"\n")
+cat("\nSaved data for",Study,"\n")
 
+# save the workspace
+save.image(file = str_c(Study,"_small.Rdata"))
 
 # Credits and copyright ---------------------------------------------------
 
