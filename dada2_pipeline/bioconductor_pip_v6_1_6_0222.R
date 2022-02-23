@@ -330,9 +330,10 @@ tail(out)
 minseq_left <- min(out[,2], na.rm = T)
 maxseq_left <- max(out[,2], na.rm = T)
 medseq_left <- median(out[,2], na.rm = T)
-minfracloss <- min((out[,1]-out[,2])/out[,2], na.rm = TRUE)
-maxfracloss <- max((out[,1]-out[,2])/out[,2], na.rm = TRUE)
-medfracloss <- median((out[,1]-out[,2])/out[,2], na.rm = TRUE)
+frac_loss <- (out[,1]-out[,2])/out[,1]
+minfracloss <- min(frac_loss, na.rm = TRUE)
+maxfracloss <- max(frac_loss, na.rm = TRUE)
+medfracloss <- median(frac_loss, na.rm = TRUE)
 
 if(play_audio) beep(sound = 6)
 
