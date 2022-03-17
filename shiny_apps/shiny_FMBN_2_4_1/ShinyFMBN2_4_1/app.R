@@ -529,7 +529,7 @@ ui <- navbarPage(
                      style = "font-size:80%"
                    ),
                    p(
-                     "Use the action button to save the table in the <table_plots> folder.",
+                     "Use the action button to save the table in the <tablesandplots> folder.",
                      style = "font-size:80%"
                    ),
                    hr(),
@@ -573,7 +573,7 @@ ui <- navbarPage(
                        style = "font-size:80%"
                      ),
                      p(
-                       "Use the action button to save the graph in the <table_plots> folder. ",
+                       "Use the action button to save the graph in the <tablesandplots> folder. ",
                        "The graph will be saved in .jpg format, 150 dpi resolution.",
                        style = "font-size:80%"
                      ),
@@ -638,7 +638,7 @@ ui <- navbarPage(
                        style = "font-size:80%"
                      ),
                      p(
-                       "Use the action button at the bottom to save the graph in the <table_plots> folder. ",
+                       "Use the action button at the bottom to save the graph in the <tablesandplots> folder. ",
                        "The graph will be saved in .jpg format, 150 dpi resolution.",
                        style = "font-size:80%"
                      ),
@@ -690,7 +690,7 @@ ui <- navbarPage(
                               style = "font-size:80%"
                             ),
                             p(
-                              "Use the action button at the bottom to save the graph in the <table_plots> folder. ",
+                              "Use the action button at the bottom to save the graph in the <tablesandplots> folder. ",
                               "The graph will be saved in .jpg format, 150 dpi resolution.",
                               style = "font-size:80%"
                             ),
@@ -2226,7 +2226,7 @@ ui <- navbarPage(
       write_tsv(filt_OTU_table(),
                 file.path(
                   "output",
-                  "table_plots",
+                  "tablesandplots",
                   paste(
                     input$fn_prefix,
                     input$save_OTU,
@@ -2235,7 +2235,7 @@ ui <- navbarPage(
                   )
                 ))
       showNotification(
-        "filtered OTU table saved to /output/table_plots folder",
+        "filtered OTU table saved to /output/tablesandplots folder",
         type = "message",
         duration = 5,
         closeButton = TRUE
@@ -2259,7 +2259,7 @@ ui <- navbarPage(
                    write_tsv(my_summaries()[[5]],
                              file.path(
                                "output",
-                               "table_plots",
+                               "tablesandplots",
                                paste(
                                  input$fn_prefix,
                                  input$save_prev_tab,
@@ -2268,7 +2268,7 @@ ui <- navbarPage(
                                )
                              ))
                    showNotification(
-                     "filtered prevalence and abundance table saved to /output/table_plots folder",
+                     "filtered prevalence and abundance table saved to /output/tablesandplots folder",
                      type = "message",
                      duration = 5,
                      closeButton = TRUE
@@ -2403,7 +2403,7 @@ ui <- navbarPage(
       ggsave(
         filename = file.path(
           "output",
-          "table_plots",
+          "tablesandplots",
           paste(
             input$fn_prefix,
             input$save_prev_graph,
@@ -2420,7 +2420,7 @@ ui <- navbarPage(
         dpi = g_dpi
       )
       showNotification(
-        "prev.&ab. plot saved to /output/table_plots folder",
+        "prev.&ab. plot saved to /output/tablesandplots folder",
         type = "message",
         duration = 5,
         closeButton = TRUE
@@ -2811,7 +2811,7 @@ ui <- navbarPage(
       ggsave(
         filename = file.path(
           "output",
-          "table_plots",
+          "tablesandplots",
           paste(
             input$fn_prefix,
             as.integer(input$save_bar_plot),
@@ -2828,7 +2828,7 @@ ui <- navbarPage(
         dpi = g_dpi
       )
       showNotification(
-        "bar plot saved to /output/table_plots folder",
+        "bar plot saved to /output/tablesandplots folder",
         type = "message",
         duration = 5,
         closeButton = TRUE
@@ -3021,7 +3021,7 @@ ui <- navbarPage(
       ggsave(
         filename = file.path(
           "output",
-          "table_plots",
+          "tablesandplots",
           paste(
             input$fn_prefix,
             as.integer(input$save_box_plot),
@@ -3038,7 +3038,7 @@ ui <- navbarPage(
         dpi = g_dpi
       )
       showNotification(
-        "box plot saved to /output/table_plots folder",
+        "box plot saved to /output/tablesandplots folder",
         type = "message",
         duration = 5,
         closeButton = TRUE
