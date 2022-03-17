@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 2, create sequence tables
 #
-# bigdata_part1_v5_1021
+# bigdata_part1_v6_0322
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -194,7 +194,25 @@ sample.names <- case_when(
   all(str_detect(basename(fnFs),".")) ~ sapply(strsplit(basename(fnFs), ".", fixed = T), `[`, 1),
 )
 
-# check for occurrence of primers and adaptors on a sample of forward and
+# do an early check for sequences and metadata
+
+# path to the metadata file (needs to be adapted)
+metadata_path <- file.path("data", "metadata", "SraRunTable.txt") 
+# alternatives when using data downloades from NCBI SRA are:
+# "data/metadata/SraRunInfo.txt" 
+# "data/metadata/SraRunTable.txt.csv"
+# "data/metadata/SraRunTable.txt"
+samdf <- read_tsv(metadata_path) 
+if(ncol(samdf)==1) samdf <- read_csv(metadata_path)
+
+
+if(all(sample.names %in% samdf$Run)){
+  cat("\nsamples in fastq files match samples in metadata\n")
+} else {
+  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+}
+
+# check for occurrence of primers and adapters on a sample of forward and
 # reverse sequences, done only for the first lane (if you suspect there are differences
 # do it on multiple groups)
 if (mygroup == 1) {
@@ -325,19 +343,21 @@ minfracloss <- min(frac_loss, na.rm = TRUE)
 maxfracloss <- max(frac_loss, na.rm = TRUE)
 medfracloss <- median(frac_loss, na.rm = TRUE)
 
-cat("After filtering there are between", 
+
+cat("After filtering there are between ", 
     minseq_left, 
-    "and", 
+    " and ", 
     maxseq_left, 
-    "(median", 
+    " (median ", 
     medseq_left, 
-    ") sequences left. The fraction of remaining sequences after filtering is between", 
+    ") sequences left. The fraction of sequences lost after filtering is between ", 
     round(minfracloss, 2), 
-    "and", 
+    " and ", 
     round(maxfracloss, 2), 
-    "(median", 
+    " (median ", 
     round(medfracloss, 2),
-    ")\n"
+    ")\n",
+    sep=""
 )
 
 if (mygroup == 1) write_tsv(filter_and_trim_par, "filtertrimpars_conc.txt")
@@ -445,7 +465,7 @@ save.image(file = str_c(Study,"_",mygroup,".Rdata"))
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021 Eugenio Parente
+# Copyright 2022 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

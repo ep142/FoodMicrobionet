@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v6_06_10_21
+# bigdata_part2_v6_3_07_03_22
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -11,7 +11,7 @@
 # a further script (part2) will carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
-# This version of the script (v6_0) includes options
+# This version of the script (v6_3) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
 # and will perform steps up to teh creation of the sequence table
@@ -31,7 +31,7 @@
 
 # load packages -----------------------------------------------------------
 
-.cran_packages <- c("tidyverse", "gridExtra", "knitr", "stringr", "reshape2", "beepr")
+.cran_packages <- c("tidyverse", "parallel", "gridExtra", "knitr", "stringr", "reshape2", "beepr")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "BiocStyle", 
                     "DECIPHER", "phangorn")
 
@@ -52,7 +52,8 @@ if(any(!.inst)) {
 }
 # Load packages into session, and print package version
 sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
-
+# the following command detects the number of cores on UNIX/MacOS
+nc <- parallel::detectCores(logical = F) # to detect physical cores in MacOS
 set.seed(100)
 
 sessionInfo()
@@ -180,11 +181,12 @@ write_tsv(as.data.frame(track2), str_c("track_all_",Study,".txt"))
 taxdb_dir <- "../tax_db" # change this if the tax databases are elsewhere
 list.files(taxdb_dir)
 
+# assignment with SILVA
+RC <- F # false by default
 
 # Loading files needed to manage taxonomy, note locations
 ref_fasta <- paste(taxdb_dir, "/silva_nr99_v138_1_train_set.fa", sep="")
 sp_ass_SILVA <- paste(taxdb_dir, "/silva_species_assignment_v138_1.fa", sep="")
-bad_taxa <- read_tsv(file.path(taxdb_dir,"SILVA_bad-taxa.txt"), na = "NA")
 
 
 # defining the function for assigning taxonomy ----------------------------
@@ -192,14 +194,14 @@ bad_taxa <- read_tsv(file.path(taxdb_dir,"SILVA_bad-taxa.txt"), na = "NA")
 # function for assigning taxonomy and returning a list of objects
 # needed to avoid copy and paste in the loop
 
-Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T){
+Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
   cat("Assigning taxonomy at the genus level with SILVA v138...", "\n")
-  taxtab <- assignTaxonomy(seqtab, refFasta = ref_fasta, multithread = TRUE)
+  taxtab <- assignTaxonomy(seqtab, refFasta = ref_fasta, multithread = TRUE, tryRC = rc)
   cat("done...", "\n")
   # do species assignment, DOES NOT WORK WITH JUST CONCATENATE
   if(!paired_end | overlapping){
     cat("Assigning taxonomy at the species level with SILVA v138...", "\n")
-    taxtab <- addSpecies(taxtab, sp_ass_SILVA)
+    taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = rc)
     cat("done...", "\n")
   }
   taxtab2 <- as_tibble(rownames_to_column(as.data.frame(taxtab, 
@@ -250,6 +252,11 @@ if(!split){
   
   taxtab_list <- Assign_taxonomy(seqtab = seqtab.nochim, 
                                  paired_end = pend, overlapping = ovlp)
+  if(mean(is.na(taxtab_list$taxtab_slot[,2]))>0.2){
+    RC<<-T
+    taxtab_list <- Assign_taxonomy(seqtab = seqtab_nochim, 
+                                   paired_end = pend, overlapping = ovlp, rc = RC)
+  }
   cat("done...","\n")
 } else {
   # this is not tested yet
@@ -267,7 +274,13 @@ if(!split){
     seqtab_nochim_temp <- seqtab.nochim[,from_c:to_c]
     cat("Assigning taxonomy...","\n")
     taxtab_list_temp <- Assign_taxonomy(seqtab = seqtab_nochim_temp, 
-                                        paired_end = pend, overlapping = ovlp)
+                                        paired_end = pend, overlapping = ovlp, rc = RC)
+    if(i == 1 && mean(is.na(taxtab_list_temp$taxtab_slot[,2]))>0.2){
+        RC<<-T
+        taxtab_list_temp <- Assign_taxonomy(seqtab = seqtab_nochim_temp, 
+                                            paired_end = pend, overlapping = ovlp, rc = RC)
+    }
+    
     cat("done...","\n")
     if(i==1) {
       taxtab_list <- taxtab_list_temp
@@ -298,8 +311,11 @@ beep(sound=6)
 taxtab <- taxtab_list$taxtab_slot
 taxtab2 <- taxtab_list$taxtab2_slot
 
-rm(taxtab_list, taxtab_list_temp, iterations, 
-   first_column, to_c, Assign_taxonomy)
+if(!split) {
+  rm(taxtab_list, taxtab_list_temp, Assign_taxonomy)
+} else {
+  rm(taxtab_list, Assign_taxonomy) 
+}
 gc()
 
 # fixing bad taxa ---------------------------------------------------------
@@ -382,7 +398,6 @@ dim(seqtab.nochim)[2]
 dotree <- F # avoid if overlapping == F
 
 if (dotree) {
-  nc = 4 # 4 for iMac, 2 for MacBook
   seqs <-
     dada2::getSequences(seqtab.nochim) # the collapse option is very interesting
   names(seqs) <- seqs # This propagates to the tip labels of the tree
@@ -411,7 +426,7 @@ if (dotree) {
   fitGTR <- update(fit, k = 4, inv = 0.2)
   Sys.sleep(5)
   # this is the step taking the longest time
-  cat("Optimizing the tree...", "\n")
+  cat("Optimization, please be patient (with >1000 seqs you are better off doing this overnight)...","\n")
   fitGTR <- optim.pml(
     fitGTR,
     model = "GTR",
@@ -693,8 +708,8 @@ check_list <- c(
   exists("study"),
   exists("myphseq"),
   exists("overlapping"),
-  exists("paired_end")
-  
+  exists("paired_end"),
+  exists("RC")
 )
 
 
@@ -702,20 +717,20 @@ mylist <- list(Study_accn = Study,
                study_df = study,
                overlap = overlapping,
                pend = paired_end,
-               physeq = myphseq)
-
-
+               physeq = myphseq,
+               rev_compl = RC)
 
 
 if(all(check_list)){
   cat("\nAll needed objects available and ready to process\n")
   saveRDS(mylist, file = str_c(Study, "_mindata.RDS"))
+  cat("\nSaved data for",Study,"\n")
 } else {
-  cat("One or more of the objects you need is missing, check your data before proceeding\n")
+  cat("\nOne or more of the objects you need is missing, check your data before proceeding\n")
 }
 
-
-cat("\nSaved data for ",Study,"\n")
+# save the workspace
+save.image(file = str_c(Study,"_small.Rdata"))
 
 
 # Credits and copyright ---------------------------------------------------

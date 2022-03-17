@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_1_6, 17/02/2022
+# DADA2/Bioconductor pipeline, modified, v6_1_7, 3/03/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -345,7 +345,7 @@ cat("After filtering there are between ",
     maxseq_left, 
     " (median ", 
     medseq_left, 
-    ") sequences left. The fraction of remaining sequences after filtering is between ", 
+    ") sequences left. The fraction of sequences lost after filtering is between ", 
     round(minfracloss, 2), 
     " and ", 
     round(maxfracloss, 2), 
@@ -586,10 +586,17 @@ list.files(taxdb_dir)
 
 
 # assignment with SILVA
+RC <- F # false by default
 
 # SILVA
 ref_fasta <- paste(taxdb_dir, "/silva_nr99_v138_1_train_set.fa", sep="")
 taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE)
+# setting tryRC to T if there are too many sequences not identified at the phylum level
+if(mean(is.na(taxtab[,2]))>0.2) {
+  RC<-T
+  taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE, tryRC = RC)
+  }
+
 # optionally, if the sequences do not get identified, add the option tryRC=T
 # which also tries the reverse complement
 if(keep_time) toc()
@@ -599,7 +606,7 @@ if(keep_time) toc()
 if(!paired_end | overlapping){
   if(keep_time) tic("\nassign taxonomy, species")
   sp_ass_SILVA <- paste(taxdb_dir, "/silva_species_assignment_v138_1.fa", sep="")
-  taxtab <- addSpecies(taxtab, sp_ass_SILVA)
+  taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = RC)
   # optionally, if the sequences do not get identified, add the option tryRC=T
   # which also tries the reverse complement
   if(keep_time) toc()
@@ -1031,8 +1038,8 @@ check_list <- c(
   exists("study"),
   exists("myphseq"),
   exists("overlapping"),
-  exists("paired_end")
-  
+  exists("paired_end"),
+  exists("RC")
 )
 
 
@@ -1040,20 +1047,19 @@ mylist <- list(Study_accn = Study,
                study_df = study,
                overlap = overlapping,
                pend = paired_end,
-               physeq = myphseq)
-
-
+               physeq = myphseq,
+               rev_compl = RC)
 
 
 if(all(check_list)){
   cat("\nAll needed objects available and ready to process\n")
   saveRDS(mylist, file = str_c(Study, "_mindata.RDS"))
+  cat("\nSaved data for",Study,"\n")
 } else {
   cat("\nOne or more of the objects you need is missing, check your data before proceeding\n")
 }
 
 
-cat("\nSaved data for",Study,"\n")
 
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
