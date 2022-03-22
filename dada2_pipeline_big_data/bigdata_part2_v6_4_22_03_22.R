@@ -8,8 +8,6 @@
 # This script is designed to process large studies using the
 # DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html with options
 # for large studies https://benjjneb.github.io/dada2/bigdata.html
-# a further script (part2) will carry out further processing needed to ready the output for import
-# into FoodMicrobionet
 
 # This version of the script (v6_3) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
@@ -18,14 +16,13 @@
 # For each iteration of the script over the identifiers.txt table, created with
 # the getHeader script, a new sequence table is created and saved from the
 # corresponding group fo sequences. These are then assembled and processed
-# usign the bigdata_part2 script
+# using the bigdata_part2 script which carries out further processing needed to ready 
+# the output for import into FoodMicrobionet
 
-# to use this script follow the instructions in script bigdata_part1 and run getHeader and bigdata_part1 
-# (as many times as there are groups in the identifier file)
-# 7. download the taxonomy reference files from https://benjjneb.github.io/dada2/training.html
+# to use this script follow the instructions in script bigdata_part1 and run  
+# getHeader and bigdata_part1 (as many times as there are groups in the identifier file)
 
 # You can easily adapt the script to your own data
-# Make sure you have run the getHeader script and created the identifiers.txt table
 
 # Run the script one section at a time
 
@@ -81,7 +78,7 @@ target2 <- region
 
 
 # merge multiple runs -----------------------------------------------------
-# could be done with sapply or similar
+# note for self: maybe use a functional instead
 # get the sequence files
 seq_files <- list.files()[grepl("seqtab_f_", list.files())]
 seq_tables <- str_remove(seq_files, ".Rdata")
@@ -126,7 +123,6 @@ length(single_double)/ncol(seqtab.nochim)
 singletons <- which(colSums(seqtab.nochim)<=1)
 length(singletons)
 length(singletons)/ncol(seqtab.nochim)
-# 15.9%
 doubletons <- which(colSums(seqtab.nochim)==2)
 length(doubletons)
 
@@ -140,7 +136,6 @@ if(remove_s_d){
 dim(seqtab.nochim)
 # check which is the abundance of chimeras removed
 sum(seqtab.nochim)/sum(st.all)
-# keeps 98.2% after filtering
 # check the distribution of removals
 summary(rowSums(seqtab.nochim)/rowSums(st.all))
 
@@ -174,7 +169,6 @@ track2$n_issues <- rowSums(dplyr::select(track2, high_chim:low_seq_n))
 write_tsv(as.data.frame(track2), str_c("track_all_",Study,".txt"))
 
 
-
 # assign taxonomy ---------------------------------------------------------
 
 # set the directory for taxonomy databases
@@ -182,7 +176,7 @@ taxdb_dir <- "../tax_db" # change this if the tax databases are elsewhere
 list.files(taxdb_dir)
 
 # assignment with SILVA
-RC <- F # false by default
+RC <- F # option for trying reverse complement, false by default
 
 # Loading files needed to manage taxonomy, note locations
 ref_fasta <- paste(taxdb_dir, "/silva_nr99_v138_1_train_set.fa", sep="")
@@ -198,7 +192,7 @@ Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
   cat("Assigning taxonomy at the genus level with SILVA v138...", "\n")
   taxtab <- assignTaxonomy(seqtab, refFasta = ref_fasta, multithread = TRUE, tryRC = rc)
   cat("done...", "\n")
-  # do species assignment, DOES NOT WORK WITH JUST CONCATENATE
+  # do species assignment (only if overlapping or not paired end)
   if(!paired_end | overlapping){
     cat("Assigning taxonomy at the species level with SILVA v138...", "\n")
     taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = rc)
@@ -208,7 +202,7 @@ Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
                                                         stringsAsFactors = F), "ASV"))
   if(!"Species" %in% colnames(taxtab)) taxtab2$Species <- NA_character_
   
-  # may be in the future add a variable with the Study, just to merge the database of ASVs
+  # maybe in the future add a variable with the Study, just to merge the database of ASVs
   
   taxtab2[is.na(taxtab2)] <- ""
   taxtab2 <- taxtab2 %>%
@@ -234,9 +228,10 @@ Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
 
 split_point <- 2500
 # if <2500 ASVs, run in one set, else split and use a loop
-# roughly vor short sequences, like V4 you can set to 5000, while for V1-V3 
-# and V3-V4 2500 is safer with 8 Gb RAM
 # else run only once
+# roughly for short sequences, like V4 you can set to 5000, while for V1-V3 
+# and V3-V4 2500 is safer with 8 Gb RAM
+
 split <- F
 if(dim(seqtab.nochim)[2]>=split_point) split <-T
 
@@ -392,8 +387,7 @@ save(taxtab, seqtab.nochim, track2, Study, target, region,
 # https://www.bioconductor.org/packages/3.7/bioc/vignettes/DECIPHER/inst/doc/ArtOfAlignmentInR.pdf
 dim(seqtab.nochim)[2]
 # if this is >46k will crash
-# but it is already prohibitive with 20k
-# and usually not worth the effort
+# but it is already prohibitive with 20k and usually not worth the effort
 
 dotree <- F # avoid if overlapping == F
 
@@ -419,7 +413,7 @@ if (dotree) {
   cat("Performing Neighbor joining...", "\n")
   # perform Neighbor joining
   treeNJ <- phangorn::NJ(dm) # Note, tip order != sequence order
-  cat("Calculating internal maximum likelyhood...", "\n")
+  cat("Calculating internal maximum likelihood...", "\n")
   # internal maximum likelihood for tree
   fit = phangorn::pml(treeNJ, data = phang.align)
   Sys.sleep(5)
@@ -479,14 +473,15 @@ rownames(samdf) <- samdf$Run
 
 track2 <- mutate(track2, prop_tax_filt = data/nonchim)
 
-
 rownames(samdf) <- samdf$Run
 
 # a transposed sequence table
 seqtab_t <- t(seqtab.nochim)
 dim(seqtab_t)
+
 # may have dropped a few runs because they lacked seqs
 samdf_2 <- samdf %>% dplyr::filter(Run %in% colnames(seqtab_t))
+
 # just checking
 # colnames(seqtab_t) == row.names(samdf_2)
 all(colnames(seqtab_t) == row.names(samdf_2))
@@ -537,15 +532,18 @@ if(is_null(seq_center)) seq_center <- unique(samples$Center.Name)
 # extract the average read length as an integer
 read_length <- round(mean(nchar(rownames(ttab)), na.rm = T)) 
 
-# adapt this or sett manually a comma delimited string of countries.
-loc_list <- str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =",")
+# adapt this or set manually a comma delimited string of countries.
+loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
+                   str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =","),
+                   NA_character_)
 
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
                 read_length_bp = read_length, seq_center = seq_center,
                 tax_database = "SILVA v138_1", Seq_accn = seq_accn,
                 samples = n_samples, DOI = DOI, geoloc = loc_list, 
-                primer_f, primer_r)
+                primer_f, primer_r, overlapping = overlapping, 
+                paired_end = paired_end)
 # saves study info
 write_tsv(study, str_c(Study,"_study.txt"))
 
@@ -556,9 +554,14 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c(Isolation_source, Library.Name, sep =", "))
+  mutate(description = str_c("Fermented meat batter", Sample_Name, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
+
+# need to adapt this manually because of inconsistencies in geo_loc field names
+samples$geo_loc_name_country <- NA_character_
+samples$geo_loc_name_country_continent <- NA_character_
+samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with

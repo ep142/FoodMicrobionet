@@ -14,7 +14,7 @@
 # This version of the script (v5_0, 10/2021) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
-# and will perform steps up to teh creation of the sequence table
+# and will perform steps up to the creation of the sequence table
 # For each iteration of the script over the identifiers.txt table, created with
 # the getHeader script, a new sequence table is created and saved from the
 # corresponding group fo sequences. These are then assembled and processed
@@ -121,7 +121,7 @@ if (mygroup==1){
   # expected amplicon length ? including primers
   primer_f <- "28F" 
   primer_r <- "Gray519r"  
-  target1 <- "16S_RNA"
+  target1 <- "16S_DNA"
   target2 <- region
   
   # V3-V4
