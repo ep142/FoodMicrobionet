@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v6_3_07_03_22
+# bigdata_part2_v6_5_23_03_22
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -172,15 +172,15 @@ write_tsv(as.data.frame(track2), str_c("track_all_",Study,".txt"))
 # assign taxonomy ---------------------------------------------------------
 
 # set the directory for taxonomy databases
-taxdb_dir <- "../tax_db" # change this if the tax databases are elsewhere
+taxdb_dir <- file.path("..","tax_db") # change this if the tax databases are elsewhere
 list.files(taxdb_dir)
 
 # assignment with SILVA
 RC <- F # option for trying reverse complement, false by default
 
 # Loading files needed to manage taxonomy, note locations
-ref_fasta <- paste(taxdb_dir, "/silva_nr99_v138_1_train_set.fa", sep="")
-sp_ass_SILVA <- paste(taxdb_dir, "/silva_species_assignment_v138_1.fa", sep="")
+ref_fasta <- file.path(taxdb_dir, "silva_nr99_v138_1_train_set.fa")
+sp_ass_SILVA <- file.path(taxdb_dir, "silva_species_assignment_v138_1.fa")
 
 
 # defining the function for assigning taxonomy ----------------------------

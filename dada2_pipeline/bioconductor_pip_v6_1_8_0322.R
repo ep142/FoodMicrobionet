@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_1_7, 3/03/2022
+# DADA2/Bioconductor pipeline, modified, v6_1_8, 23/03/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -581,7 +581,7 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 if(keep_time) tic("\nassign taxonomy, genus")
 
-taxdb_dir <- "../tax_db" # change this if the tax databases are elsewhere
+taxdb_dir <- file.path("..","tax_db") # change this if the tax databases are elsewhere
 list.files(taxdb_dir)
 
 
@@ -589,7 +589,7 @@ list.files(taxdb_dir)
 RC <- F # false by default
 
 # SILVA
-ref_fasta <- paste(taxdb_dir, "/silva_nr99_v138_1_train_set.fa", sep="")
+ref_fasta <- file.path(taxdb_dir, "silva_nr99_v138_1_train_set.fa")
 taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE)
 # setting tryRC to T if there are too many sequences not identified at the phylum level
 if(mean(is.na(taxtab[,2]))>0.2) {
@@ -605,7 +605,7 @@ if(keep_time) toc()
 
 if(!paired_end | overlapping){
   if(keep_time) tic("\nassign taxonomy, species")
-  sp_ass_SILVA <- paste(taxdb_dir, "/silva_species_assignment_v138_1.fa", sep="")
+  sp_ass_SILVA <- file.path(taxdb_dir, "silva_species_assignment_v138_1.fa")
   taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = RC)
   # optionally, if the sequences do not get identified, add the option tryRC=T
   # which also tries the reverse complement
@@ -862,7 +862,6 @@ if(is_null(seq_center)) seq_center <- unique(samples$Center.Name)
 # extract the average read length as an integer
 read_length <- round(mean(nchar(rownames(ttab)), na.rm = T)) 
 
-# adapt this or sett manually a comma delimited string of countries.
 # adapt this or set manually a comma delimited string of countries.
 loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
                     str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =","),

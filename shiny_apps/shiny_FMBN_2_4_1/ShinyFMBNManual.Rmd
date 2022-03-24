@@ -51,7 +51,7 @@ This is probably the best way to run the app when you use it for the first time,
 
 1. set the working directory to the folder containing the app folder (look [here](https://support.rstudio.com/hc/en-us/articles/200711843-Working-Directories-and-Workspaces) for instructions)  
 
-2. open the script (in RStudio use the File->Open file menu)
+2. open the script (in RStudio use the File--Open file menu)
 
 3. run the script using the Run or Run app command in the header bar of the script
 
@@ -77,7 +77,7 @@ This is probably the best way to run the app when you use it for the first time,
 
 **C. launching the app from the source pane**
 
-1. use the File->Open menu to open the app (you may have to navigate to the app folder if it is not in your working directory)
+1. use the File--Open menu to open the app (you may have to navigate to the app folder if it is not in your working directory)
 
 2. use the Run App button to run the app (if you want you can select the run mode)
 
@@ -141,7 +141,7 @@ This tab allows you to select a subset of samples for further analysis. Initiall
 
 ## **The Aggregate tab.**
 
-The aggregate tab will display all the relevant tables from FoodMicrobionet after the application of your filters^[if you do not use any filter and tick at least the <apply> checkbox for selecting studies, all studies, samples and taxa will be shown but, because of the size of the matrices (>3x10^6^ elements) that are created, the app may freeze for several minutes.].
+The aggregate tab will display all the relevant tables from FoodMicrobionet after the application of your filters^[if you do not use any filter and tick at least the **apply** checkbox for selecting studies, all studies, samples and taxa will be shown but, because of the size of the matrices (more than 3x10^6^ elements) that are created, the app may freeze for several minutes.].
 
 On the right of the screen you will find:
 
@@ -168,6 +168,7 @@ Using the **Show** drop down menu you can choose to visualize samples and taxa b
 ## **The Export tab**.
 
 Here you will be able to export your selection in a variety of formats and generate (and export) some further summary tables and graphs of the data after aggregation. You just need to provide a prefix for the filenames and click on the action buttons. Files will be saved in different subfolders in the /output subfolder in the app. Please note that every time you click an action button a new file is saved whose name will include the file prefix, an integer (which is incremented by 1 every time you click on the action button) and a file suffix identifying the content of the file(s).
+**Please note** no filtering is performed at this stage, so the output might be different from that obtained using functions for generating tables and graphs (see right panel of this tab).
 
 ![**Figure 8.** The export tab.](images/exporttab.png)
 
@@ -193,36 +194,37 @@ Some taxa are removed by default (Mitochondria and Chloroplasts, other Eukaryoti
 
 ## Graphical and tabular output.  
 
-The **Aggregate** tab provides a few quick graphs and tables, which can be accessed using the tabs in the right side of the window.  
+The **Export** tab provides a few quick graphs and tables, which can be accessed using the tabs in the right side of the window.  
+**Please note** a few "taxa" are removed by default (Chloroplasts, Mitochondria, Eukaryoes, etc.)
 
 ### **The OTU table**.
 
-Using this tab you can visualize an OTU table for the top n taxa (100 by default) in decreasing order of relative abundance. Use the slider to select n. Please realize that no rarefaction is performed: therefore samples/studies with more sequences will have a larger influence on the results. Use the <Save>; button to save the table in tab delimited format.
+Using this tab you can visualize an OTU table for the top n taxa (100 by default) in decreasing order of relative abundance. Use the slider to select n. Please realize that no rarefaction is performed: therefore samples/studies with more sequences will have a larger influence on the results. Use the **save**; button to save the table in tab delimited format.
 
 ![**Figure 9.** The OTU table](images/otutable.png)  
 
 ### **The prevalence and abundance table**.
 
-This table shows prevalence and average, minimum and maximum relative abundance for all the taxa in your dataset. As above, no rarefaction is performed. Use the <Save>; button to save the table in tab delimited format.
+This table shows prevalence and average, minimum and maximum relative abundance for all the taxa in your dataset. As above, no rarefaction is performed. Use the **save** button to save the table in tab delimited format.
 
 ![**Figure 10.** The prevalence table.](images/prevalencetable.png)  
 
 ### **The prevalence and abundance plot.**
 
-This tab shows a prevalence and abundance plot. Minimum prevalence and abundance (initially both are set to 0) can be chosen using two sliders. The graph is recalculated and the subtitle shows the number of taxa retained at different taxonomic resolutions. The results will affect both the bar and box plot. Use the \&lt;Save\&gt; button to save the graph as a 5x7 in, 150 dpi .jpg image^[type of graph, size and resolution can only be changed by changing the code, sorry (see lines 56-61 of the app).].
+This tab shows a prevalence and abundance plot. Minimum prevalence and abundance (initially both are set to 0) can be chosen using two sliders. The graph is recalculated and the subtitle shows the number of taxa retained at different taxonomic resolutions. The results will affect both the bar and box plot. Use the **save** button to save the graph as a 5x7 in, 150 dpi .jpg image^[type of graph, size and resolution can only be changed by changing the code, sorry (see lines 56-61 of the app).].
 
 ![**Figure 11.** Prevalence and abundance plot.](images/prevabplot.png)  
 
 ### **The bar plot tab.**  
 
-The bar plot tab features a stacked bar plot of abundance of the top (in terms of prevalence and/or abundance, see below) x taxa (by defauilt 25). You can choose the number of taxa to display, their taxonomic aggregation level and the sample aggregation level (both are affected by choices in the aggregate tab. The app will automatically select the aggregation level for sample/sample groups and for taxa in such a way that the lowest aggregation level compatible with showing no more than 25 samples/sample groups or taxa is selected. The two drop down menus are generated on the fly in such a way that the use of too many taxa or samples/sample groups is prevented. If you want to select a lower taxa aggregation level you can use the filters in the prevalence and abundance graph tab (i.e. increase min. prevalence and/or abundance until the taxonomic level of your interest has \&lt;=25 categories, this is shown in the graph subtitle). Use the <Save> button to save the graph (see above for details).
+The bar plot tab features a stacked bar plot of abundance of the top (in terms of prevalence and/or abundance, see below) x taxa (by defauilt 25). You can choose the number of taxa to display, their taxonomic aggregation level and the sample aggregation level (both are affected by choices in the aggregate tab. The app will automatically select the aggregation level for sample/sample groups and for taxa in such a way that the lowest aggregation level compatible with showing no more than 25 samples/sample groups or taxa is selected. The two drop down menus are generated on the fly in such a way that the use of too many taxa or samples/sample groups is prevented. If you want to select a lower taxa aggregation level you can use the filters in the prevalence and abundance graph tab (i.e. increase min. prevalence and/or abundance until the taxonomic level of your interest has less than 25 categories, this is shown in the graph subtitle). Use the **save** button to save the graph (see above for details).
 
 ![**Figure 12.** The bar plot tab.](images/barplot.png)  
 
 
 ### **The box plot tab.**
 
-This tab features a box plot (the default, or a violin plot, selected using the plot type menu) of the relative abundance of the top most abundant 25 taxa. Choices made for sample aggregation in the bar plot tab will be reflected here, but you can use the sliders to choose the taxa aggregation level and the taxa to display^[by default all are selected; otherwise you can deselect all and add n taxa from the \&lt;select taxa\&gt; drop down menu.]. Use the <Save>; button to save the graph (see above for details).
+This tab features a box plot (the default, or a violin plot, selected using the plot type menu) of the relative abundance of the top most abundant 25 taxa. Choices made for sample aggregation in the bar plot tab will be reflected here, but you can use the sliders to choose the taxa aggregation level and the taxa to display^[by default all are selected; otherwise you can deselect all and add n taxa from the **select taxa** drop down menu.]. Use the **save**; button to save the graph (see above for details).
 
 ![**Figure 13.** The box plot tab.](images/boxplot.png)
 
