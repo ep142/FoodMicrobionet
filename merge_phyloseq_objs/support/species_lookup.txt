@@ -61,6 +61,8 @@ Clostridium sensu stricto 15 tetani	Clostridium tetani	Clostridium tetani	Clostr
 Clostridium_sensu_stricto_15 tetani	Clostridium tetani	Clostridium tetani	Clostridium	Clostridiaceae
 Clostridium sensu stricto 16 malenominatum	Clostridium malenominatum	Clostridium malenominatum	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_16 malenominatum	Clostridium malenominatum	Clostridium malenominatum	Clostridium	Clostridiaceae
+Clostridium sensu stricto 18 botulinum	Clostridium botulinum	Clostridium botulinum	Clostridium	Clostridiaceae
+Clostridium sensu stricto_18 botulinum	Clostridium botulinum	Clostridium botulinum	Clostridium	Clostridiaceae
 Clostridium sensu stricto 18 oceanicum	Clostridium oceanicum	Clostridium oceanicum	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_18 oceanicum	Clostridium oceanicum	Clostridium oceanicum	Clostridium	Clostridiaceae
 Clostridium sensu stricto 2 cadaveris	Clostridium cadaveris	Clostridium cadaveris	Clostridium	Clostridiaceae
@@ -217,6 +219,8 @@ Prevotella 7 denticola	Prevotella denticola	Prevotella denticola	Prevotella	Prev
 Prevotella_7 denticola	Prevotella denticola	Prevotella denticola	Prevotella	Prevotellaceae
 Prevotella 7 histicola	Prevotella histicola	Prevotella histicola	Prevotella	Prevotellaceae
 Prevotella_7 histicola	Prevotella histicola	Prevotella histicola	Prevotella	Prevotellaceae
+Prevotella_7 jejuni	Prevotella jejuni	Prevotella jejuni	Prevotella	Prevotellaceae
+Prevotella 7 jejuni	Prevotella jejuni	Prevotella jejuni	Prevotella	Prevotellaceae
 Prevotella 7 melaninogenica	Prevotella melaninogenica	Prevotella melaninogenica	Prevotella	Prevotellaceae
 Prevotella_7 melaninogenica	Prevotella melaninogenica	Prevotella melaninogenica	Prevotella	Prevotellaceae
 Prevotella_7 multiformis	Prevotella multiformis	Prevotella multiformis	Prevotella	Prevotellaceae

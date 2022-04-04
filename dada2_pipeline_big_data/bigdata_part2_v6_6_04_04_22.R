@@ -369,7 +369,7 @@ if(any(pull(taxtab2, s_label) %in% pull(bad_taxa, s_label))){
     mutate(Genus = ifelse(is.na(new_genus), Genus, new_genus),
            Family = ifelse(is.na(new_family), Family, new_family),
            Order = ifelse(is.na(new_order), Order, new_order),
-           Class = ifelse(is.na(new_class), Order, new_class),
+           Class = ifelse(is.na(new_class), Class, new_class),
     ) %>%
     select(-(new_kingdom:new_species))
 }
