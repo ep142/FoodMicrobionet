@@ -1,6 +1,6 @@
 # Import_in_FMBN ----------------------------------------------------------
 
-# a script for assisting the inclusion of new studies in FMBN# version 3.7 16/11/2021
+# a script for assisting the inclusion of new studies in FMBN# version 3.8 05/04/2022
 
 library(readxl)
 library(tidyverse)
@@ -34,13 +34,10 @@ if("tax_database" %in% colnames(study)) {
 #cross-check number of samples, expression must be TRUE
 study$samples == n_samples_edge
 
-# ad hoc changes, will not be necessary for more recent versions of the study
-# file (after December 2021)
+if(!("overlapping" %in% colnames(study))) study$overlapping <- NA
+if(!("paired_end" %in% colnames(study))) study$paired_end <- NA
 
-study$primer_f <- "26F4a" # AGAGTTTGATCMTGGCTCAG
-study$primer_r <- "534R4" # GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAGGACTMTTACCGCGGCNGCTGGCAC contains adapters
-study$overlapping <- F
-study$paired_end <- T
+
 
 # make pipeline fields
 
