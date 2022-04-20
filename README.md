@@ -38,3 +38,5 @@ This repository will eventually contain the different versions of FoodMicrobione
 
 - folder **the_real_thing** contains the database in two formats: R lists and Excel files (each in their own folder). Both are safer to use than text files for which occasional problems with accented letters and special characters occur in different locales. As a bonus, I am including in the folder with the R listas a .Rmd document designed to provide a statistical report on the current version of FMBN  
 
+__Known issues__
+As of April 2022 BioConductor does not support the arm64 build of R. Therefore, if you have a Mac with a M1 processor you are better off using the standard version of R.
