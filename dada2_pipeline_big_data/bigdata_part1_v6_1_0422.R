@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 2, create sequence tables
 #
-# bigdata_part1_v6_0322
+# bigdata_part1_v6_1_0422
 ################################################################################
 
 # This script is designed to process large studies using the
@@ -11,7 +11,7 @@
 # a further script (bigdata_part2) will carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
-# This version of the script (v5_0, 10/2021) includes options
+# This version of the script (v6.1, 26/04/22) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
 # and will perform steps up to the creation of the sequence table
@@ -455,6 +455,12 @@ head(track)
 
 saveRDS(track, file = str_c("track_",mygroup,".RDS"))
 save.image(file = str_c(Study,"_",mygroup,".Rdata"))
+
+
+# Package citations -------------------------------------------------------
+
+map(c(.cran_packages, .bioc_packages), citation)
+
 
 # Credits and copyright ---------------------------------------------------
 

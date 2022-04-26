@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_1_8, 23/03/2022
+# DADA2/Bioconductor pipeline, modified, v6_1_9, 26/04/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -7,7 +7,7 @@
 # and to carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
-# This version of the script (v6_0, 09/2021) includes options
+# This version of the script (v6_1, 04/2022) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
 # In addition Greengenes is not used anymore for taxonomic assignment
@@ -1063,6 +1063,12 @@ if(all(check_list)){
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
 
+
+# Package citations -------------------------------------------------------
+
+map(c(.cran_packages, .bioc_packages), citation)
+
+
 # Credits and copyright ---------------------------------------------------
 
 # Most of the script is taken from https://benjjneb.github.io/dada2/tutorial.html
@@ -1070,7 +1076,7 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021 Eugenio Parente
+# Copyright 2021, 2022 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

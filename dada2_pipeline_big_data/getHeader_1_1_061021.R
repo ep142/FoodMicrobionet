@@ -2,7 +2,7 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 1, split the fastq files in groups
 #
-# getHeader: a script to extract fastQ header v1.1 6/10/2021
+# getHeader: a script to extract fastQ header v1.2 26/04/2022
 ################################################################################
 
 # this script is designed to work in conjunction with a modified version of the
@@ -99,12 +99,20 @@ identifiers$analysis_order <- c(rep(1,60), rep(2,55))
 
 write_tsv(identifiers, file = "identifiers.txt")
 
+# Package citations -------------------------------------------------------
+
+map(.cran_packages, citation)
+
+
+
+
+
 # Credits and copyright ---------------------------------------------------
 
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021 Eugenio Parente
+# Copyright 2021, 2022 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

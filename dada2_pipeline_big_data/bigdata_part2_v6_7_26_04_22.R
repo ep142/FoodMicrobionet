@@ -2,14 +2,14 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v6_5_23_03_22
+# bigdata_part2_v6_7_26_04_22
 ################################################################################
 
 # This script is designed to process large studies using the
 # DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html with options
 # for large studies https://benjjneb.github.io/dada2/bigdata.html
 
-# This version of the script (v6_3) includes options
+# This version of the script (v6_7) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
 # and will perform steps up to teh creation of the sequence table
@@ -736,6 +736,12 @@ if(all(check_list)){
 save.image(file = str_c(Study,"_small.Rdata"))
 
 
+# Package citations -------------------------------------------------------
+
+map(c(.cran_packages, .bioc_packages), citation)
+
+
+
 # Credits and copyright ---------------------------------------------------
 
 # Most of the script is taken from https://benjjneb.github.io/dada2/tutorial.html
@@ -744,7 +750,7 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021 Eugenio Parente
+# Copyright 2021, 2022 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 
