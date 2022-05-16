@@ -1,15 +1,15 @@
 ################################################################################
 # DADA2/Bioconductor pipeline for big data, modified
-# part 2, create sequence tables
+# part 1, create sequence tables
 #
-# bigdata_part1_v6_1_0422
+# bigdata_part1_v6_2_0522
 ################################################################################
 
 # This script is designed to process large studies using the
 # DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html with options
 # for large studies https://benjjneb.github.io/dada2/bigdata.html
-# a further script (bigdata_part2) will carry out further processing needed to ready the output for import
-# into FoodMicrobionet
+# a further script (bigdata_part2) will carry out further processing needed to 
+# prepare the output for import into FoodMicrobionet
 
 # This version of the script (v6.1, 26/04/22) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
@@ -38,8 +38,8 @@
 
 # load packages -----------------------------------------------------------
 
-.cran_packages <- c("tidyverse", "gridExtra", "knitr", "stringr", "reshape2", "beepr")
-.bioc_packages <- c("BiocManager","dada2", "phyloseq", "DECIPHER", "phangorn", 
+.cran_packages <- c("tidyverse", "beepr")
+.bioc_packages <- c("BiocManager","dada2", "phyloseq", 
                     "BiocStyle", "ShortRead")
 
 .inst <- .bioc_packages %in% installed.packages()
@@ -124,10 +124,10 @@ if (mygroup==1){
   target1 <- "16S_DNA"
   target2 <- region
   
-  # V3-V4
-  # forward primer 17 bp
-  # reverse primer 21 bp
-  # expected length 464
+  # V1-V3
+  # forward primer 16 bp
+  # reverse primer 18 bp
+  # expected length 509
   
   # save general data
   gen_data <- list(Study = Study, target = target, region = region, DOI = DOI,

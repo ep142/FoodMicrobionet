@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_1_9, 26/04/2022
+# DADA2/Bioconductor pipeline, modified, v6_2, 3/05/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -7,7 +7,7 @@
 # and to carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
-# This version of the script (v6_1, 04/2022) includes options
+# This version of the script (v6_2, 05/2022) includes options
 # for single end/paired end data sets obtained with Illumina or 454 or
 # Ion Torrent
 # In addition Greengenes is not used anymore for taxonomic assignment
@@ -113,7 +113,7 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 
 # expected amplicon length 469 including primers
 primer_f <- "338F" # ACTCCTACGGGAGGCAGCAG
-primer_r <- "806R"  # ACTCCTACGGGAGGCAGCAG
+primer_r <- "806R"  # GGACTACHVGGGTWTCTAAT
 target1 <- "16S_DNA"
 target2 <- region
 
@@ -162,7 +162,8 @@ if(use_accn_list) {
   sample.names <- sample.names[seq_to_process]
 }
 
-# do an early check for sequences and metadata
+
+# early check for sequences and metadata --------------------------------
 
 # path to the metadata file (needs to be adapted)
 metadata_path <- file.path("data", "metadata", "SraRunTable.txt.csv") 
@@ -466,7 +467,7 @@ seqtab.all <- makeSequenceTable(mergers)
 lengthdistr <- table(nchar(getSequences(seqtab.all)))
 # I should automate this step 
 lengthdistr
-barplot(lengthdistr, main = "sequence length distirbution")
+barplot(lengthdistr, main = "sequence length distribution")
 
 if(keep_time) toc()
 
@@ -838,7 +839,7 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 # prepare files for FMBN ----------------------------------------------
 
-# The following instructions are needed to prepare objects which, after further
+# The following commands are needed to prepare objects which, after further
 # processing using the Import_in_FMBN_xx.R script, will be used to generate
 # .txt files for import i FMBN tables
 
@@ -886,9 +887,13 @@ samples <- samples %>%
   mutate(description = str_c("Water-buffalo mozzarella", SampleName, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
-samples$geo_loc_name_country <- NA_character_
-samples$geo_loc_name_country_continent <- NA_character_
-samples$lat_lon <- NA_character_
+
+# information of geoloc (and names of the field) is very inconsistent:
+# check the info in your sample metadata and adatp these commands
+# use these if part or all of the geolocation information is missing
+# samples$geo_loc_name_country <- NA_character_
+# samples$geo_loc_name_country_continent <- NA_character_
+# samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
@@ -899,7 +904,7 @@ samples <- samples %>%
   select(label2, n_reads2, n_issues, description, target1, target2, 
          biosample = BioSample, SRA_Sample = BioSample, SRA_run = Run, 
          geo_loc_country = geo_loc_name_country, 
-         geo_loc_continent = geo_loc_name_country_continent, lat_lon)
+         geo_loc_continent = geo_loc_name_country_continent, lat_lon = Lat_Lon)
 
 
 # save the sample information

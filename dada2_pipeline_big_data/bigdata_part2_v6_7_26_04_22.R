@@ -558,10 +558,12 @@ samples <- samples %>%
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
-# need to adapt this manually because of inconsistencies in geo_loc field names
-samples$geo_loc_name_country <- NA_character_
-samples$geo_loc_name_country_continent <- NA_character_
-samples$lat_lon <- NA_character_
+# information of geoloc (and names of the field) is very inconsistent:
+# check the info in your sample metadata and adatp these commands
+# use these if part or all of the geolocation information is missing
+# samples$geo_loc_name_country <- NA_character_
+# samples$geo_loc_name_country_continent <- NA_character_
+# samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
@@ -572,7 +574,7 @@ samples <- samples %>%
   select(label2, n_reads2, n_issues, description, target1, target2, 
          biosample = BioSample, SRA_Sample = BioSample, SRA_run = Run, 
          geo_loc_country = geo_loc_name_country, 
-         geo_loc_continent = geo_loc_name_country_continent, lat_lon)
+         geo_loc_continent = geo_loc_name_country_continent, lat_lon = Lat_lon)
 
 
 # save the sample information

@@ -385,11 +385,17 @@ write_tsv(select(edges, sampleId, taxonId, weight, Source, otulabel = s_label),
           paste(study$Seq_accn, "_edges_to_FMBN.txt", sep = ""))
 
 
+# Package citations -------------------------------------------------------
+
+map(c("tidyverse", "readxl", "magrittr"), citation)
+
+
+
 # Credits and copyright ---------------------------------------------------
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021 Eugenio Parente
+# Copyright 2021, 2022 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 
