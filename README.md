@@ -1,6 +1,6 @@
 # FoodMicrobionet
 
-This repository will eventually contain the different versions of FoodMicrobionet (as Shiny apps and/or R lists) and of the R scripts created to access the data or to do statistical and graphical analysis.
+This repository will eventually contain the different versions of FoodMicrobionet (as Shiny apps and/or R lists) and of the R scripts created to access the data or to carry out statistical and graphical analysis.
 
 -  file FoodMicrobionet\_tablespecs.md describes the specification for FoodMicrobionet tables
 
