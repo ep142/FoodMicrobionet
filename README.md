@@ -41,4 +41,4 @@ This repository will eventually contain the different versions of FoodMicrobione
 - folder **miscellaneous** contains miscellaneous scripts used to generate figures and tables in papers related to FoodMicrobionet. While I try to do my best to document what I am doing I don't always have the time to make the scripts fool proof. Read carefully the comments and, if you are reasonably good at programming with R, you should be OK..
 
 __Known issues__
-As of April 2022 BioConductor does not support the arm64 build of R. Therefore, if you have a Mac with a M1 processor you are better off using the standard version of R.
+As of April 2022 BioConductor does not support the arm64 build of R. Therefore, if you have a Mac with a M1 or M2 processor you are better off using the standard version of R.
