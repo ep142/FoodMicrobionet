@@ -1,0 +1,673 @@
+---
+title: 'FMBN stats: a script for extracting summary statistics from FoodMicrobionet'
+author: "Prof. E. Parente, Scuola SAFE, Università degli Studi della Basilicata"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+# loading packages
+.cran_packages <- c("tidyverse", "randomcoloR", "knitr", "rnaturalearth",
+                    "rnaturalearthdata")
+
+.inst <- .cran_packages %in% installed.packages()
+
+if(any(!.inst)) {
+  install.packages(.cran_packages[!.inst])
+}
+
+sapply(.cran_packages, require, character.only = TRUE)
+
+opar <- par(no.readonly=TRUE) 
+par(ask=F) 
+set.seed(1234) 
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+
+```
+
+
+
+```{r loading_data}
+
+FMBN_plus <- readRDS(file.path("FMBN", "FMBN_plus.rds"))
+
+```
+
+# FMBN statistics.  
+
+This report is designed to provide summary statistics for FoodMicrobionet, version 4.1.2 or higher. It takes as an input the FMBN_plus list and returns text, tables and graphs.  
+These results are for FoodMicrobionet version `r FMBN_plus$version_n`.  
+
+
+# Statistics on studies.
+
+`r FMBN_plus$version`. The number of studies in FMBN is `r nrow(FMBN_plus$studies)`.
+
+```{r studies, dpi=96}
+
+# tiny tweaks only needed once for version 4.1.2 
+
+# FMBN_plus$studies$platform[104] <- "Illumina NextSeq 500"
+
+# FMBN_plus$studies$platform[129] <-"Illumina HiSeq X Five"
+
+# saveRDS(FMBN_plus, "FMBN_plus.rds")
+
+growth_FMBN <- FMBN_plus$studies %>%
+  group_by(FMBN_version) %>%
+  summarise(nstudies = n(),
+            nsamples = sum(samples)) %>%
+  ungroup() %>%
+  mutate(cum_sum_studies = cumsum(nstudies),
+         cum_sum_samples = cumsum(nsamples))
+# the table
+growth_FMBN
+
+# the graph for studies
+ggplot(growth_FMBN) +
+  geom_area(mapping = aes(x = FMBN_version, y = cum_sum_studies, group = 1)) +
+  labs(
+    x = "FMBN version",
+    y = "cumulative number of studies",
+    title = "The growth of FMBN, studies"
+  ) + 
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+# the graph for samples
+ggplot(growth_FMBN) +
+  geom_area(mapping = aes(x = FMBN_version, y = cum_sum_samples, group = 1)) +
+  labs(
+    x = "FMBN version",
+    y = "cumulative number of samples",
+    title = "The growth of FMBN, samples"
+  ) + 
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+```
+
+The largest growth in studies and samples has been between version 3.1 (published in 2019) and version 3.2 (unpublished).  
+
+## Platforms, gene target, regions.  
+
+FMBN grows by addition of sequences deposited in NCBI SRA for published studies. As a consequence, use of targets (16S RNA, 16S RNA gene) reflect what is published and the correlation between platforms and targets.  
+
+```{r platform_region, dpi = 96}
+
+platform_region <- dplyr::select(FMBN_plus$studies, platform, region, samples, year)
+
+platform_region <- platform_region %>%
+  mutate(
+    platform_2 = case_when(
+      str_detect(platform, "454 GS") ~ "454 GS",
+      str_detect(platform, "Illumina") ~ "Illumina",
+      str_detect(platform, "Ion Torrent") ~ "Ion Torrent"
+    )
+  ) %>%
+  mutate(year = as.numeric(year))
+
+
+# platforms vs time
+platform_time <- platform_region %>%
+  group_by(platform_2, year) %>%
+  dplyr::filter(!is.na(year)) %>%
+  tally()
+# make a mini df
+minyear <- min(platform_time$year)
+maxyear <- max(platform_time$year)
+platforms <- unique(platform_time$platform_2)
+
+platforms_0 <- tibble(
+  year = rep(minyear:maxyear, length(platforms)),
+  platform_2 = rep(platforms, each = maxyear-minyear+1),
+  n1 = rep(0, (maxyear-minyear+1)*length(platforms))
+)
+# merge the two and create cumulative sum
+platform_time_2 <- left_join(platforms_0, platform_time) %>%
+  mutate(n = ifelse(is.na(n),0,n)) %>% 
+  group_by(platform_2) %>%
+  mutate(cum_sum_studies = cumsum(n)) 
+
+platform_time_2 %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = platform_2)) +
+  geom_area() +
+  labs(
+    x = "year",
+    y = "cumulative number of studies",
+    fill = "platform",
+    title = "The growth of FMBN, studies, by platform"
+  ) + 
+  theme_bw() +
+  scale_x_continuous(breaks = seq(minyear, maxyear,2), minor_breaks = seq(minyear, maxyear, 1)) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# a table
+platform_region %>% group_by(platform_2) %>% 
+  count(platform_2) %>%
+  ungroup() %>%
+  mutate(prop =prop.table(n))
+  
+# targets vs time
+region_time <- platform_region %>%
+  dplyr::filter(!is.na(year)) %>%
+  group_by(region, year) %>%
+  tally()
+regions <- unique(region_time$region)
+regions_0 <- tibble(
+  year = rep(minyear:maxyear, length(regions)),
+  region = rep(regions, each = maxyear-minyear+1),
+  n1 = rep(0, (maxyear-minyear+1)*length(regions))
+)
+# merge the two and create cumulative sum
+region_time_2 <- left_join(regions_0, region_time) %>%
+  mutate(n = ifelse(is.na(n),0,n)) %>% 
+  group_by(region) %>%
+  mutate(cum_sum_studies = cumsum(n)) 
+
+region_time_2 %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = region)) +
+  geom_area() +
+  labs(
+    x = "year",
+    y = "cumulative number of studies",
+    fill = "target",
+    title = "The growth of FMBN, studies, by 16S region"
+  ) + 
+  scale_fill_brewer(type = "qual", palette = "Paired") +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(minyear, maxyear,2), minor_breaks = seq(minyear, maxyear, 1)) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# ggsave(filename = "region_time.tiff", dpi = 300)
+
+addmargins(xtabs(~ region + platform_2, platform_region))
+
+
+```
+
+The distribution of studies by platform and region reflect current practices in metataxonomic analysis of food microbial communities. With phasing out of 454 GS (most studies targeted V1-V3), the majority of studies is now Illumina with either V3-V4 (which alone make 52% of studies) or V4 (15%).
+
+```{r studies_by_food_group}
+# a table
+FMBN_plus$studies %>% group_by(food_group) %>% 
+  count(food_group) %>%
+  ungroup() %>%
+  mutate(prop =prop.table(n)) %>%
+  arrange(desc(prop)) %>%
+  mutate(cum_prop = cumsum(prop))
+
+```
+FMBN includes studies on `r length(unique(FMBN_plus$studies$food_group))` food groups. The majority of studies is on dairy products.
+
+# Statistics on samples.  
+
+The number of samples in FMBN has been rising almost exponentially with time. FMBN is the richest database in terms of number of samples for foods and food environments, and it is also the best annotated one.
+
+## Statistics by food group.  
+
+```{r sample_by_food_group_stats}
+samples <- FMBN_plus$samples
+
+# samples by food group
+sample_tab_byL1 <- samples %>% 
+  group_by(L1) %>%
+  count(L1) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop))
+kable(sample_tab_byL1, digits = c(0,4,4,4))
+
+# how many different foodIds in samples (excluding environments)
+food_id_samples <- samples %>%
+  dplyr::filter(s_type == "Sample") %>% 
+  group_by(foodId) %>%
+  count(foodId) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop))
+foodIds <- nrow(food_id_samples)
+
+# how many different llabels
+n_llabels <- samples %>%
+  dplyr::filter(s_type == "Sample") %>%
+  count(llabel) %>%
+  nrow()
+
+```
+Samples in FMBN belong to  `r length(unique(samples$L1))` major food groups (L1 level of FoodEx2 exposure classification).  
+There are `r xtabs(~s_type, data = samples)[1]` environmental samples and `r xtabs(~s_type, data = samples)[2]` food samples.
+Samples in FMBN are further classified using levels L4 and L6 of the FoodEx2 exposure classification, and additional fields (which allow to identify raw products, intermediates or finished products, the level of thermal treatment and the occurrence of spoilage and/or fermentation) allow a finer classification. 
+Samples in FMBN belong to  `r length(unique(samples$L4))` L4 food groups and `r length(unique(samples$L6))` L6 food groups. There are `r foodIds` foodIds (food types), and, combining further information on samples (nature, heat treatment, spoilage/fermentation), there are `r n_llabels` combinations.  
+
+## Statistics by gene targets and number of sequences.  
+
+The structure of FoodMicrobionet allows the user to fine-tune each search and extract just the combination of samples s/he desires. Below, I am showing a few stats on number of sequences, by region. However, the user can perform searches based on the type of target, the region, he length of sequences per sample and even the occurrence of issues during the bioinformatic analysis (low number of sequences, high proportion of losses in a specific phase of the pipeline).    
+
+```{r sequences_by_region, dpi = 96}
+
+ggplot(samples, mapping = aes(x = target2, y = log10(n_reads2))) +
+  geom_boxplot() +
+  labs(x = "region",
+       y = "log10(reads)",
+       title = "Distribution of reads per sample, by region") +
+  scale_y_continuous(breaks = seq(0,7,1)) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# ggsave(filename = "reads_by_region.tiff", dpi = 300)
+
+ggplot(samples, mapping = aes(x = log10(n_reads2))) +
+  stat_ecdf() +
+  labs(x = "log10(reads)",
+       y = "proportion",
+       title = "Cumulative distribution of reads") +
+  scale_y_continuous(breaks = seq(0,1,0.1)) +
+  scale_x_continuous(breaks = seq(0,7,1)) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# ggsave(filename = "nreadscumdistr.tiff", dpi = 300)
+  
+```
+
+
+## Geographical distribution of samples.  
+
+From version 4.1.2 geographic location of samples (when provided in metadata) was added to the samples table.  
+We plan to fill up this information on existing ssamples and will continue adding it to new samples. However, interested users should always double check on the original paper for the meaning of the coordinates (are they the place of sampling? the origin of the food? For example, there is a Japanese study studying imported French cheeses: which should be the location?).  
+
+```{r samples_by_location}
+# creating a table for continents
+table_by_continent <- samples %>%
+  group_by(geo_loc_continent) %>%
+  count(geo_loc_continent) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop))
+kable(table_by_continent, digits = c(0,4,4,4))
+# creating a table for countries
+table_by_country <- samples %>%
+  group_by(geo_loc_country) %>%
+  count(geo_loc_country) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop),
+         geo_loc_country = if_else(geo_loc_country == "USA", "United States of America", geo_loc_country))
+kable(table_by_country, digits = c(0,4,4,4))
+
+world_2 <- left_join(world, 
+                     dplyr::select(table_by_country, sovereignt=geo_loc_country, n_samples = n)) %>%
+  mutate(logn_samples = log10(n_samples))
+
+# ggplot(data = world_2) +
+#  geom_sf(aes(fill = logn_samples)) +
+# scale_fill_viridis_c(direction = -1, na.value = "white") +
+#  labs(fill = "log10(samples)",
+#       title = "Number of samples, by country") +
+#  theme_bw() +
+#  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(data = world_2) +
+  geom_sf(aes(fill = n_samples), size = I(0.2)) +
+ scale_fill_viridis_c(direction = -1, na.value = "white", trans = "log2") +
+  labs(fill = "samples (log2 scale)",
+       title = str_c("Number of samples, by country, FoodMicrobionet", 
+                     FMBN_plus$version_n, sep = " ")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# ggsave(filename = "nsamples_by_country.tiff", dpi = 300, units = "in", width = 9, height = 5)
+# ggsave(filename = "nsamples_by_country.jpg", dpi = 300)
+
+```
+
+# Statistics for taxa.  
+
+For all studies belonging to version 1.1 or higher, FoodMicrobionet was created by a dedicated pipeline using SILVA for taxonomic assignment. The revision of samples belonging to previous version is in progress and, in the future, a script will be used to reprocess sequences when a new version of SILVA is releases. A few tweaks on taxonomy are needed for coherence and for compatibility with external databases.  
+We always try to assign sequences to the lowest possible level (given the length of sequences and their quality). Statistics for taxonomic assignment are shown below.  
+
+```{r stats_on_taxa}
+
+taxa <- FMBN_plus$taxa
+
+# a table by identification level
+table_by_idelevel <- taxa %>%
+  group_by(idelevel) %>%
+  count(idelevel) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop))
+kable(table_by_idelevel, digits = c(0,4,4,4))
+
+# a table for phyla
+table_by_phyla <- taxa %>%
+  group_by(phylum) %>%
+  count(phylum) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop),
+         cumn = cumsum(n)) 
+table_by_phyla$roworder <- seq(1,nrow(table_by_phyla))
+table_by_phyla <- table_by_phyla %>% 
+  mutate(cumroworder = cumsum(roworder))
+
+kable(table_by_phyla, digits = c(0,4,4,4))
+
+# cumulative distribution
+ggplot(table_by_phyla, mapping = aes(x = log10(n))) +
+  stat_ecdf() +
+  labs(x = "number of taxa",
+       y = "proportion",
+       title = "Cumulative distribution of number of taxa by phylum") +
+  scale_y_continuous(breaks = seq(0,1,0.1)) +
+  scale_x_continuous(breaks = seq(0,7,1)) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(table_by_phyla, mapping = aes(x = roworder, y = cumn)) +
+  geom_point() +
+  scale_y_log10(breaks = seq(2000, 10000, 500)) +
+  scale_x_continuous(breaks = seq(0, 200, 20), minor_breaks = seq(0, 200, 5)) +
+  labs(y = "cumulative number of taxa", 
+       x = "cumulative number of phyla") +
+  theme_bw()
+
+```
+
+There are currently `r nrow(taxa)-1` taxa in this version of FoodMicrobionet identified at different identification levels. The proportion of taxa identified at the genus level or below is `r table_by_idelevel$cumprop[2]`.  
+The variety of taxa detected is very high. There are `r nrow(table_by_phyla)-1` different phyla in This version of FoodMicrobionet.  
+
+## More on taxonomic assignment.  
+
+The depth of taxonomic assignment depends on a number of factors (quality and length of the sequences, quality of the reference database, etc.). Here, we will present tables and graphs on this subject.  
+
+```{r get_edges}
+
+# get the edges for all studies for which dada2 was used for processing
+
+# get the studyIds
+studyIds_dada2 <- FMBN_plus$studies %>% 
+  dplyr::filter(bioinf_software == "R dada2") %>%
+  pull(studyId)
+
+# get sampleIds
+sampleIds_dada2 <- FMBN_plus$samples %>% 
+  dplyr::filter(studyId %in% studyIds_dada2) %>%
+  pull(sampleId)
+
+# get edges
+
+edges_sel <- FMBN_plus$edges %>%
+  dplyr::filter(sampleId %in% sampleIds_dada2)
+
+# annotate with study and region info
+
+edges_sel_ann <- left_join(
+  edges_sel, 
+  select(samples, sampleId, studyId, n_reads2, n_issues, L1:L6, target1, target2)
+)
+
+# annotate with taxonomic info
+
+edges_sel_ann <- left_join(
+  edges_sel_ann, 
+  select(taxa, taxonId:species, idelevel)
+)
+
+# annotate with further info from studies
+
+edges_sel_ann <- left_join(
+  edges_sel_ann, 
+  select(FMBN_plus$studies, studyId, overlapping)
+)
+
+# create a variable with region/overlap
+
+edges_sel_ann <- edges_sel_ann %>%
+  unite(col = "target", target2, overlapping, remove = F)
+
+# make idelevel an ordered factor
+
+edges_sel_ann <- edges_sel_ann %>%
+  mutate(idelevel = factor(idelevel, 
+                           levels = c("species", "genus", "family", "order", 
+                                      "class", "plylum", "domain"),
+                           ordered = T))
+
+# add a columns with number of sequences per edge
+edges_sel_ann <- edges_sel_ann %>% 
+  mutate(seqs = weight * n_reads2/100)
+
+# get average number of issues and sequence length by study
+issues_length <- FMBN_plus$studies %>%
+  dplyr::filter(studyId %in% studyIds_dada2) %>%
+  select(studyId, read_length_bp, target, region, overlapping) 
+ave_issues <- samples %>% 
+  dplyr::filter(sampleId %in% sampleIds_dada2) %>%
+  group_by(studyId) %>%
+  summarize(ave_issues = mean(n_issues))
+issues_length <- left_join(issues_length, ave_issues) %>%
+  unite(col = "target2", region, overlapping, remove = F)
+
+summary_tab_edges <- edges_sel_ann %>%
+  select(studyId, n_issues, L1:seqs) %>%
+  group_by(studyId, .drop = F) 
+
+summary_tab_edges_unw <- summary_tab_edges %>%
+  count(idelevel) %>%
+  mutate(freq = n/sum(n))
+
+summary_tab_edges_w <- summary_tab_edges %>%
+  count(idelevel, wt = seqs) %>%
+  mutate(freq = n/sum(n))
+
+summary_tab_edges_both <- left_join(summary_tab_edges_unw,
+                                    select(summary_tab_edges_w,
+                                           studyId, idelevel, nw = n, freqw = freq))
+
+# join region and seq length and issues
+
+summary_tab_edges_both_ann <- left_join(summary_tab_edges_both,
+                                        issues_length)
+```
+After some processing to obtain the information from the various tables, here is a box plot showing identifications at the genus level or below, by region.  
+
+```{r box_plot_ide_by_region, dpi = 96}
+summary_tab_edges_both_ann_sg <- summary_tab_edges_both_ann %>%
+  dplyr::filter(idelevel == "genus" | idelevel == "species") %>%
+  group_by(studyId, .drop = F) %>%
+  summarize(freq_sg = sum(freq),
+            freq_sgw = sum(freqw)) %>%
+  left_join(., issues_length)
+
+# medians by region, only those including V3 or V4
+summaries <- summary_tab_edges_both_ann_sg %>% 
+  dplyr::filter(str_detect(target2, "V3") | str_detect(target2, "V4")) %>%
+  ungroup() %>%
+  group_by(target2) %>% 
+  summarize(n = n(),
+            medianfreq = median(freq_sg),
+            medianfreqw = median(freq_sgw),
+            perc90freq = quantile(freq_sg, 0.9),
+            perc90freqw = quantile(freq_sgw, 0.9))
+# summaries_all
+summaries_all <- summary_tab_edges_both_ann_sg %>% 
+  ungroup() %>%
+  group_by(target2) %>% 
+  summarize(n = n(),
+            medianfreq = median(freq_sg),
+            medianfreqw = median(freq_sgw),
+            perc90freq = quantile(freq_sg, 0.9),
+            perc90freqw = quantile(freq_sgw, 0.9))
+# write_tsv(summaries_all, "idefreqgenusspecies.txt")
+
+# now only for species, with overlapping true
+summary_species <- summary_tab_edges_both_ann %>%
+  dplyr::filter(str_detect(target2, "TRUE")) %>%
+  dplyr::filter(idelevel == "species") %>%
+  group_by(studyId, .drop = F) %>%
+  summarize(freq_sg = sum(freq),
+            freq_sgw = sum(freqw)) %>%
+  left_join(., issues_length)
+
+summary_species_table <- summary_species %>% 
+  ungroup() %>%
+  group_by(target2) %>% 
+  summarize(n = n(),
+            medianfreq = median(freq_sg),
+            medianfreqw = median(freq_sgw),
+            perc90freq = quantile(freq_sg, 0.9),
+            perc90freqw = quantile(freq_sgw, 0.9))
+# write_tsv(summary_species_table, "idefreqspecies.txt")
+
+
+ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target2, y = freq_sg)) +
+  geom_boxplot() + 
+  geom_jitter(mapping = aes(color = ave_issues)) +
+  labs(x = "target region",
+    y = "species + genus freq.",
+    color = "ave. issues") +
+  scale_y_continuous(breaks = seq(0.6, 1, 0.05), minor_breaks = seq(0.6, 1, 0.01)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+# ggsave("idefreqgenspunw.tiff", dpi = 600)
+```
+
+Longer sequences for which a good overlap was obtained in paired end sequences (_TRUE) clearly result in a higher proportion of taxonomic assignments at the genus level or below. There is some relationship with the quality of sequences /number of issues encountered during bioinformatic processing: with more issues, in general, the quality of taxonomic assignment is worse, but this is not always true.  
+However, if one keeps into account the number of sequences rather than just counting the ASVs for which assignment at the genus level or below level was possible, it is clear that a high proportion of total sequences received taxonomic assignment at the genus level or below.  
+
+```{r weighed_box_plot, dpi = 96}
+ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target2, y = freq_sgw)) +
+  geom_boxplot() + 
+  geom_jitter(mapping = aes(color = ave_issues)) +
+  labs(x = "target region",
+       y = "species + genus freq., weighted",
+       color = "ave. issues") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+# ggsave("idefreqgenspw.tiff", dpi = 600)
+```
+```{r more_V3, dpi = 96, eval = F}
+# only those containing V3 or V4, not V5
+summary_tab_edges_both_ann_sg %>%
+  dplyr::filter(!str_detect(target2, "V5") & !str_detect(target2, "V6")) %>%
+  ggplot(mapping = aes(x = target2, y = freq_sgw)) +
+  geom_boxplot() + 
+  geom_jitter(mapping = aes(color = ave_issues)) +
+  labs(x = "target region",
+       y = "species + genus freq., weighted",
+       color = "ave. issues") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+
+```
+
+It is very likely that this situation may depend on biases in the composition of reference taxonomic databases (in this case SILVA v138.1), in which the number of sequences varies widely in different taxonomic groups.  
+
+The ability to obtain a taxonomic assignment down to the genus level varies by phylum. Only the 4 most abundant phyla are shown.   
+
+```{r taxo_assign_b_phylum, dpi = 96}
+# which are important phyla?
+abundant_phyla <- edges_sel_ann %>%
+  group_by(phylum) %>%
+  summarize(abundance_sum = sum(weight),
+            abundance_mean = mean(weight)) %>%
+  arrange(desc(abundance_sum))
+
+four_abundant_phyla <- abundant_phyla %>%
+  slice(1:4) %>%
+  pull(phylum)
+
+summary_tab_edges_4phyla <- edges_sel_ann %>%
+  select(studyId, n_issues, L1:seqs) %>%
+  dplyr::filter(phylum %in% four_abundant_phyla) %>%
+  group_by(studyId, phylum, .drop = F) 
+
+summary_tab_edges_4phyla_unw <- summary_tab_edges_4phyla %>%
+  count(idelevel) %>%
+  mutate(freq = n/sum(n))
+
+summary_tab_edges_w_4phyla <- summary_tab_edges_4phyla %>%
+  count(idelevel, wt = seqs) %>%
+  mutate(freq = n/sum(n))
+
+summary_tab_edges_4_phyla_both <- left_join(summary_tab_edges_4phyla_unw,
+                                    select(summary_tab_edges_w_4phyla,
+                                           studyId, phylum, idelevel, nw = n, freqw = freq))
+
+summary_tab_edges_4_phyla_both_sg <- summary_tab_edges_4_phyla_both %>%
+  ungroup() %>%
+  dplyr::filter(idelevel == "genus" | idelevel == "species") %>%
+  group_by(studyId, phylum, .drop = F) %>%
+  summarize(freq_sg = sum(freq),
+            freq_sgw = sum(freqw)) %>%
+  left_join(., issues_length)
+
+ggplot(summary_tab_edges_4_phyla_both_sg, mapping = aes(x = phylum, y = freq_sg)) +
+  facet_wrap(~target2) +
+  geom_boxplot() + 
+  geom_jitter(alpha = 0.5) +
+  labs(x = "phylum",
+       y = "species + genus freq.",
+       color = "ave. issues") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+# ggsave("idefreqgenspunw_phylum.tiff", dpi = 600)
+```
+
+This is even more evident if the data are weighted using the number of sequences and if only the most common target regions are used.  
+
+```{r weighted_by_phylum, dpi = 96}
+summary_tab_edges_4_phyla_both_sg %>%
+  dplyr::filter(!str_detect(target2, "V5") & !str_detect(target2, "V6") & !str_detect(target2, "V2")) %>%
+  ggplot(mapping = aes(x = phylum, y = freq_sgw)) +
+  facet_wrap(~target2) +
+  geom_boxplot() + 
+  geom_jitter(alpha = 0.5) +
+  labs(x = "phylum",
+       y = "species + genus freq., weighted",
+       color = "ave. issues") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+# ggsave("idefreqgenspw_phylum.tiff", dpi = 600)
+```
+Taxonomic assignment down to the genus level is clearly worse for Actinobacterota and Bacteroidota and region V1-V3 tipycally results in a higher proportion of taxonomic assignments down to the genus level. However, this is likely to be confounded with the taxonomic platform.  
+
+# Credits and copyright.
+
+This is version 2.1 of the script, 2/8/2022.  
+
+Assume that the code in this document is overall under MIT licence
+
+Copyright 2021, 2022 Eugenio Parente, Università degli Studi della Basilicata.
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Citations for R packages used in this document.  
+
+```{r r_packages}
+sapply(.cran_packages, citation)
+```
+
+## Citations for FoodMicrobionet. 
+
+```{r FoodMicrobionet_refs}
+kable(FMBN_plus$references[,2:3], col.names = c("Reference", "DOI"))
+
+```
+
+
