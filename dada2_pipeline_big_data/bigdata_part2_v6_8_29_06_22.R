@@ -534,7 +534,7 @@ read_length <- round(mean(nchar(rownames(ttab)), na.rm = T))
 
 # adapt this or set manually a comma delimited string of countries.
 loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
-                   str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =","),
+                   str_c(flatten_chr(distinct(samdf, geo_loc_name_country)), collapse =", "),
                    NA_character_)
 
 # put together and save study info

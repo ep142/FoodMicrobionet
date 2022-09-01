@@ -1,5 +1,5 @@
 ################################################################################
-# DADA2/Bioconductor pipeline, modified, v6_2, 3/05/2022
+# DADA2/Bioconductor pipeline, modified, v6_3, 3/05/2022
 ################################################################################
 
 # This script is designed to process reasonably large studies using the
@@ -865,7 +865,7 @@ read_length <- round(mean(nchar(rownames(ttab)), na.rm = T))
 
 # adapt this or set manually a comma delimited string of countries.
 loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
-                    str_c(flatten_chr(distinct(samdf, geo_loc_name_country)) ,sep =","),
+                    str_c(flatten_chr(distinct(samdf, geo_loc_name_country)), collapse =", "),
                     NA_character_)
 
 # put together and save study info
