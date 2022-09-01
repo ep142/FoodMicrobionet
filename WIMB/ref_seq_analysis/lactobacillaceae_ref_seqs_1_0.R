@@ -23,8 +23,10 @@
 #   1. the metadata for type strains as a .tab delimited file; here 
 #      Lactobacillaceae_metadata_w_outg.txt (it includes and outgroup column)
 #   2. the sequences of the 16S RNA gene for the type strain, as a list lb_ts_seqs.rds
-#   3. tab delimited files with data frames of reference sequences from SILVA
-#      SILVA_genus_species.txt
+#   3. tab delimited file with data frames of reference sequences from SILVA
+#      SILVA_genus_species.txt This is too large to upload on GitHub but can be 
+#      easily created using the make_seq_df.R script and the SILVA v138.1 database
+#      available on Zenodo (https://doi.org/10.5281/zenodo.4587954)
 #   4. the reference databases for genus and species assignment formatted for dada2
 #      (https://benjjneb.github.io/dada2/training.html) in a folder called tax_db 
 #      placed one level up from the project folder or working directory (not included)
