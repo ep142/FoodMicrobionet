@@ -26,7 +26,7 @@ The structure of the database is illustrated in Figure 1. Phyloseq objects are c
 
 ![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/image001_4_2.png)
 
-The emphasis is now on data extraction and processing using a range of R Shiny apps, and most of the new features were designed to facilitate processing with other software packages (Microsoft Excel, Gephi, Cytoscape, the CoNet App of Cytoscape, the bipartite package and the `phyloseq` package of R). To learn more on FMBN visit our web site at: [http://www.foodmicrobionet.org](http://www.foodmicrobionet.org/).
+The emphasis is now on data extraction and processing using a range of R Shiny apps, and most of the new features were designed to facilitate processing with other software packages (Microsoft Excel, Gephi, Cytoscape, the CoNet App of Cytoscape, the bipartite package and the `phyloseq` package of R). 
 
 All scripts are available at <https://github.com/ep142/FoodMicrobionet>.
 

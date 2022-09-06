@@ -757,8 +757,8 @@ ui <- navbarPage(
                p(
                  "To learn more on FoodMicrobionet and its development visit ",
                  span(
-                   a("our homepage. ",
-                     href = "http://www.foodmicrobionet.org",
+                   a("our GirHub repo. ",
+                     href = "https://github.com/ep142/FoodMicrobionet",
                      target = "_blank")
                  ),
                  "To cite FoodMicrobionet and see related articles ",

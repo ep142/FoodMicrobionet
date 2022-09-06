@@ -8,11 +8,11 @@ Data are organized in tables:
 * Samples: metadata on samples for each study
 * Edges: taxa abundance for each sample
 * Taxa: metadata on taxa
-* To learn more on FoodMicrobionet and its development visit [our homepage](http://www.foodmicrobionet.org). To cite FoodMicrobionet and see related articles go [here](http://www.foodmicrobionet.org). To download a manual for this app [click here](http://www.foodmicrobionet.org/wp-content/uploads/2019/11/manual_shinyFMBN_v2_1_11_19.docx)
+* To learn more on FoodMicrobionet and its development visit [our GitHub repository](https://github.com/ep142/FoodMicrobionet). 
 
 ### About this app
 
-This app (version 2) is designed to provide an interface to:
+This app (version 2.4) is designed to provide an interface to:
 
 * explore studies and samples;  
 
@@ -28,7 +28,7 @@ This app (version 2) is designed to provide an interface to:
 
 The function for installing/loading packages is taken verbatim from [here](https://f1000research.com/articles/5-1492/v2). A few others pieces of code were readapted from [here](https://tinyurl.com/tng8qgw).
 
-Copyright 2018, 2019, 2020, 2021 Eugenio Parente, Universita' degli Studi della Basilicata
+Copyright 2018, 2019, 2020, 2021, 2022 Eugenio Parente, Universita' degli Studi della Basilicata
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
