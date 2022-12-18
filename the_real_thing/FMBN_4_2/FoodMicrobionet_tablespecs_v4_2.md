@@ -270,7 +270,7 @@ The **edges table** includes a list of all relationships between taxa and sample
 
 ## **Version history**.
 
-This is a very simple table vith version number, citation, if any, and link to the webpage describing the version of the FooMicrobionet website.  
+This is a very simple table with version number, a brief description and citation, if any.  
 
 ## **References**.
 
