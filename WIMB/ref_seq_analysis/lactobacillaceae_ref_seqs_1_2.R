@@ -350,7 +350,7 @@ conf_matrices %>%
   labs(x = "Genus") +
   theme_bw() +
   theme(axis.text.y = element_text(hjust = 1, vjust = 0.5, size = 8, face = "italic"))
-# this is figure 2 in th paper
+# this is figure 2 in the paper
 # ggsave(file = str_c(taxo_group,"_confusionmatrices.tiff"), dpi = 300, width = 8, height = 4)
 
 # this is supplementary table 2
@@ -762,12 +762,26 @@ sp_match_bar_plot <- ggplot(match_df, aes(x = Genus, fill = match_type, y = weig
   geom_bar(stat = "identity", position = "fill") +
   scale_fill_manual(values = c("nomatch" = "red", "pmatch" = "cyan", "match" = "blue")) +
   labs(fill = "species assignm.", y = "proportion") +
-  theme_bw()+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 9))
 sp_match_bar_plot
 
-# this is Figure 3 in the manuscript
-# ggsave(sp_match_bar_plot, filename = str_c(taxo_group,"spmatchesbarplot.tiff", sep = "_"), dpi = 300)
+sp_match_bar_plot_flipped <- ggplot(match_df, aes(x = Genus, fill = match_type, y = weight)) + 
+  facet_wrap(~region)+
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = c("nomatch" = "red", "pmatch" = "cyan", "match" = "blue")) +
+  scale_y_continuous(breaks = seq(0,1,0.10)) +
+  labs(fill = "species assignm.", y = "proportion") +
+  coord_flip() +
+  theme_bw() +
+  theme(axis.text.y = element_text(hjust = 1, size = 9, face = "italic")) +
+  theme(axis.text.x = element_text(hjust = 1, vjust = 0.5, angle = 90))
+sp_match_bar_plot_flipped
+
+# this is Figure 3 in the paper
+# ggsave(sp_match_bar_plot_flipped, filename = str_c(taxo_group,"spmatchesbarplot.tiff", sep = "_"), dpi = 300)
+ggsave(sp_match_bar_plot_flipped, filename = str_c(taxo_group,"spmatchesbarplot.tiff", sep = "_"), dpi = 300,
+       width = 8, height = 7)
 
 match_sp_ide_box_plot <- bind_rows(
   mutate(sp_matches_ts_fl, region = "full length"),
