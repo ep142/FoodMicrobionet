@@ -51,6 +51,10 @@ TF_colors <- c("#F8766D", "#619CFF")
 names(TF_colors) <- c("FALSE", "TRUE")
 
 
+# load FMBN ---------------------------------------------------------------
+
+FMBN_path <- file.path("FMBN", "FMBN_plus.rds")
+FMBN <- readRDS(file = FMBN_path)
 
 # the taxa to search for --------------------------------------------------
 
@@ -766,6 +770,8 @@ write_tsv(prev_ab_df_fenv, "Lactobacillaceae_prev_ab_fenv_df.txt")
 pooled_edges_sample_study_fenv <- pooled_edges_sample_study_fenv %>%
   mutate(log_ab = log10(weight))
 
+box_plot_food_l_fenv <- ggplot(data = pooled_edges_sample_study_fenv,
+                               mapping = aes(x = description, y = log_ab))
 
 bplot_coordflip_facet_genus_fenv <- box_plot_food_l_fenv +
   facet_wrap(~factor(genus, ordered = T, levels = genera_ordered)) +
@@ -781,7 +787,7 @@ bplot_coordflip_facet_genus_fenv <- box_plot_food_l_fenv +
         axis.text.y = element_text(hjust = 1, vjust = 0.5, face = "bold"),
         strip.text = element_text(face = "italic"))
 bplot_coordflip_facet_genus_fenv
-ggsave(bplot_coordflip_facet_genus_fenv, filename = "FigXboxplotfood_prev_lactobacillaceae_l_LS_fenv.tiff", width = 14, height = 10, dpi = 300)
+ggsave(bplot_coordflip_facet_genus_fenv, filename = "FigXboxplotfood_prev_lactobacillaceae_l_LS_fenv.jpg", width = 14, height = 10, dpi = 300)
 
 
 
