@@ -26,9 +26,9 @@ The emphasis is now on data extraction and processing using a range of R Shiny a
 
 All scripts are available at [https://github.com/ep142/FoodMicrobionet](https://github.com/ep142/FoodMicrobionet).
 
-![](images\FMBNtables_4_2_1.jpg)
+![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/FMBNtables_4_2_1.jpg)
 
-**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.
+
 
 **The studies table**.
 
