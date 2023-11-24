@@ -29,7 +29,6 @@ All scripts are available at [https://github.com/ep142/FoodMicrobionet](https://
 ![**Figure 1**. Structure and relationships in FoodMicrobionet. FoodMicrobionet tables are in dark blue. External tables connected through links are in turquoise.](images/FMBNtables_4_2_1.jpg)
 
 
-
 **The studies table**.
 
 This table lists all relevant information for the study. The table has the following fields (each study is a record)
@@ -61,15 +60,11 @@ This table lists all relevant information for the study. The table has the follo
 25. **corr\_author\_mail** : corresponding author e-mail address
 26. **geoloc** : a list of the countries in which the samples were obtained; see samples table
 27. **study\_type** : the study type; cross-sectional, if there are not multiple time points for each treatment/sample type, longitudinal, if there are at least 5 time points for each treatment/sample type, mixed otherwise; this is followed by two numbers in the format _mxn_ where _m_ is the number of treatments/sample types and _n_ the number of time points^[1]. The number of replicates, if any, can be estimated from these figures and the total number of samples in the study  
-
-^[1]:If n is in the format x-y it indicates the range of time points
-
 28. **primer\_f** : forward primer used for amplification (see primers table)
 29. **primer\_r** : reverse primer used for amplification (see primers table)
 30. **overlapping** : logical flag indicating if during processing paired end sequences overlapped correctly (if not a 10N spacer was added between forward and reverse, see documentation for DADA2)
 31. **paired\_end** : logical flag indicating if paired end sequences were available^[2]
 
-^[2]: This is not necessarily true for all sequences obtained by Illumina, because in some cases only forward sequences were deposited in SRA
 
 **The primers table**.
 
@@ -92,16 +87,11 @@ The **samples** table includes metadata for samples/nodes. The current version o
 4. **label\_2** : character label for the sample, as given when the sample was added to FMBN. For compatibility with older versions of FMBN, the original sample label (i.e. the label as it appears in the original study or in SRA RunInfo tables under SampleName, whichever was available when the sample was added to FMBN) may have a prefix in the format xxx\_
 5. **label\_3** : this column contains the node display label (used as node display label in interactive visualisations produced with Gephi); built by combining label\_2 and foodId
 6. **llabel** : incorporates information on foodId and food status (see below) in a 10-character format (5 characters for the foo did, 3 for food status, see below for abbreviations, 1 for target, either d for 16S RNA gene or r for 16S RNA)^[3].
-
-^[3]:this is one of the fields used for filtering and labelling (in graphs)
-
 7. **s\_type** : sample type: "Sample" for nodes corresponding to food samples, and "Environment" for samples from food environments.
 8. **n\_reads** : number of reads after clean-up, empty if not available
 9. **n\_reads2** : n\_reads if available, otherwise a dummy value (3227, the median of the values of n\_reads for samples for which this information is available in FMBN v 2) to be used for samples (food or environment) if n\_reads is not available; this value is used to rebuild OTU tables with absolute frequencies starting from the edge and samples tables
 10. **n\_issues** : number of issues during sequence processing (i.e. high number of chimeras/bimeras, high loss during quality filtering, low number of features, low number of sequences after processing); set to -1 for studies 1:33 to avoid issues with column parsing when importing with readr functions
 11. **Ontology fields, samples/environment** : the hierarchical terms and IDs are derived from the food classification and description system FoodEx 2 (revision 2) adopted by the European Food Safety Authority (EFSA, 2015). The terms used in FoodMicrobionet are derived from the exposure hierarchy. For food environments they are set to the same values of the food processed in that environment.^[4]
-
-^[4]: there is an issue with food samples obtained during processing of, for example, a hard, ripened cheese. A cheese curd is quite obviously a completely different environment compared to a mature hard cheese. This issue is dealt with by the "Nature" field; when the correct classification is not found in FoodEx or information are partially missing the closest relative is used.
 
   1. **foodId** : the code from the FoodEx 2 classification. A few special codes were used for situations that did not fit in this classification: MOCK and BLAK were used for mock communities and PCR/reagents blanks, respectively, while ENVXX was used for food environments which could not be associated to a specific food category
   2. **description** : a description of the sample, including at least terms from L6
@@ -110,14 +100,10 @@ The **samples** table includes metadata for samples/nodes. The current version o
   5. **L6** : level 6 in the hierarchy.
 12. **Food status fields** : these columns describe the status of the food sample (empty environmental samples). They are inferred from what is known (from the original paper, from information provided by the contributor) on a sample^[5]
 
-^[5]: in the future we may add info on intrinsic factors (pH, aW) or extrinsic factors (temperature used during storage/ripening, atmosphere); however, this information is (alas!) often missing and may need to be inferred by knowledge on the process; as an alternative one may add facets from FoodEx2, see table 22 and 25 of the document. However, this may be difficult because sample description in published studies is often incomplete.
-
   1. **nature** : **Raw** (raw material or ingredient), **Intermediate** , **Finished** (including the products during storage). Shorthands: r, i, f; 0 for environmental samples or when this information is not available.
   2. **process** : **None** (raw materials and foods other than those covered by the other options); **Mild** (foods with no physical lethal treatment; includes foods with added preservatives, mild heat treatments and fermentation); **Type2** (foods submitted at least to a lethal treatment resulting potentially in a 6D decrease in _L. monocytogenes_, but whose treatment is lower than that of type 1 foods; in these foods the heat treatment is between 70°C for 2 min and 90°C for 10 min); **Type1** (foods submitted at least to a lethal treatment resulting potentially in a 6D decrease in _C. botulinum_ type E spores, approximately 90°C for 10 min or equivalent)^[6]. Shorthands: n, m, 2, 1; 0 for environmental samples or when this information is not available.
   3. **spoilage**^[includes foods at the end of shelf life, even if they do not show clear spoilage.]:**NA** (no information available), **Unspoiled** (all fresh or processed, non-spoiled foods, u); **Fermented** (all unspoiled fermented foods, f), **Spoiled** (all non-fermented foods which are spoiled or are at the end of shelf-life, b), **Fermented+spoiled** (fermented foods which are also spoiled or at the end of shelf-life, b). 0 is used for environmental samples or when this information is not available.
-  
-  ^[6]: this is applicable to ready to eat foods. Both type1 and type2 may include fermented foods which have been submitted to a heat treatment ACMSF, 2007. Report on safe cooking of burgers.Retrieved from http://www.food.gov. uk/multimedia/pdfs/acmsfburgers0807.pdf.
-  
+
 13. **target1** : the gene used as a target
 14. **target2** : the region used as a target
 15. **links to NCBI SRA database**:
@@ -145,9 +131,6 @@ The **taxa** table includes information on the lineages of taxa included in FMBN
   6. **genus**
   7. **species**
 4. **id\_L6** the taxonomic assignment including the lineage in the format^[7]: Root:k\_\_Bacteria\_\_Firmicutes:c\_\_Bacilli:f\_\_Lactobacillaceae:g\_\_Lactobacillus:s\_\_Lactobacillusdelbrueckii
-
-^[7]: It is important to understand that the original taxonomic lineage obtained when directly analysing sequences from SRA/ENA or from contributors is manually edited for coherence. Contributors have submitted in the past OTU abundance tables with lineages in different formats and obtained from different version of taxonomic reference databases; as a result, the same taxon often had a different lineage, especially for _incertae sedis_ taxa. When a new lineage is added several steps are carried out: lineages pointing to the same (at the genus, family, class, phylum level) taxon are merged; the lineage is checked against SILVA classification, bad taxa (taxa missing one level of classification) are fixed and a few genera are edited to allow linking to external database (_Corynebacterium_1_ becomes _Corynebacterium_). When any of the taxonomic terms (k\_\_; p\_\_, c\_\_, etc.) the corresponding column is left blank.
-
 5. **taxonomy** : a lineage built for compatibility with the CoNet app of Cytoscape
 6. **idelevel** : the taxonomic level of identification (domain, …, species)
 7. **NCBI\_outlink** : outlink to NCBI taxonomy
@@ -164,7 +147,6 @@ The **edges table** includes a list of all relationships between taxa and sample
 2. **taxonId** : an integer with the number of the taxon, link to the same field of the taxa table
 3. **weight** : the OTU abundance in the sample: for (FMBN) historical reasons this is in %^[8] but is converted in frequency (0-1) or absolute abundance during filtering and selection in the ShinyFMBN app.
 
-^[8]: this was needed to set correctly node size in Gephi; proportions or number of sequences can be obtained simply by dividing by 100 or by using information in the Samples table.
 
 **The**  **Abstracts**  **table**.
 
@@ -193,3 +175,19 @@ This table is included for reference purposes, since a few fields are already in
 - Parente, E., De Filippis, F., Ercolini, D., Ricciardi, A., Zotta, T., 2019. Advancing integration of data on food microbiome studies: FoodMicrobionet 3.1, a major upgrade of the FoodMicrobionet database. _International Journal of Food Microbiology_, 305, 108249. [https://doi.org/10.1016/j.ijfoodmicro.2019.108249](https://doi.org/10.1016/j.ijfoodmicro.2019.108249)
 - Parente, E., Zotta, T., Ricciardi, A., 2022. FoodMicrobionet v4: A large, integrated, open and transparent database for food bacterial communities. Int J Food Microbiol 372, 109696. https://doi.org/10.1016/j.ijfoodmicro.2022.109696
 
+
+^[1]:If n is in the format x-y it indicates the range of time points
+
+^[2]: This is not necessarily true for all sequences obtained by Illumina, because in some cases only forward sequences were deposited in SRA
+
+^[3]:this is one of the fields used for filtering and labelling (in graphs)
+
+^[4]: there is an issue with food samples obtained during processing of, for example, a hard, ripened cheese. A cheese curd is quite obviously a completely different environment compared to a mature hard cheese. This issue is dealt with by the "Nature" field; when the correct classification is not found in FoodEx or information are partially missing the closest relative is used.
+
+^[5]: in the future we may add info on intrinsic factors (pH, aW) or extrinsic factors (temperature used during storage/ripening, atmosphere); however, this information is (alas!) often missing and may need to be inferred by knowledge on the process; as an alternative one may add facets from FoodEx2, see table 22 and 25 of the document. However, this may be difficult because sample description in published studies is often incomplete.
+
+^[6]: this is applicable to ready to eat foods. Both type1 and type2 may include fermented foods which have been submitted to a heat treatment ACMSF, 2007. Report on safe cooking of burgers.Retrieved from http://www.food.gov. uk/multimedia/pdfs/acmsfburgers0807.pdf.
+
+^[7]: It is important to understand that the original taxonomic lineage obtained when directly analysing sequences from SRA/ENA or from contributors is manually edited for coherence. Contributors have submitted in the past OTU abundance tables with lineages in different formats and obtained from different version of taxonomic reference databases; as a result, the same taxon often had a different lineage, especially for _incertae sedis_ taxa. When a new lineage is added several steps are carried out: lineages pointing to the same (at the genus, family, class, phylum level) taxon are merged; the lineage is checked against SILVA classification, bad taxa (taxa missing one level of classification) are fixed and a few genera are edited to allow linking to external database (_Corynebacterium_1_ becomes _Corynebacterium_). When any of the taxonomic terms (k\_\_; p\_\_, c\_\_, etc.) the corresponding column is left blank.
+
+^[8]: this was needed to set correctly node size in Gephi; proportions or number of sequences can be obtained simply by dividing by 100 or by using information in the Samples table.
