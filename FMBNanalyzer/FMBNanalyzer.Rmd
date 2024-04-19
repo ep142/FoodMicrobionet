@@ -1687,7 +1687,7 @@ The data used in this report were extracted from FoodMicrobionet using the Shiny
 all_packages <- c("base", .cran_packages)
 map(all_packages, citation)
 
-# for reproducibility reasins you should also run the following command
+# for reproducibility reasons you should also run the following command
 # sessionInfo()
 
 ```
