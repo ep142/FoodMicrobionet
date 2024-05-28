@@ -1,9 +1,11 @@
-# DADA2/Bioconductor pipeline for 16S, modified, v7_2_5, 03/2024
+# DADA2/Bioconductor pipeline for 16S, modified, v7_2_7, 03/2024
 
 #  Description & instructions ---------------------------------------------
 
-# This script is designed to process reasonably large studies using the
-# DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html
+# This script is designed to process sequences for small studies (<60-80 
+# samples, but even 100  can be processed depending on RAM) of amplicon targeted 
+# metagenomic data for fungi using the DADA2 pipeline 
+# https://benjjneb.github.io/dada2/tutorial.html
 # and to carry out further processing needed to ready the output for import
 # into FoodMicrobionet
 
@@ -26,7 +28,7 @@
 #    3.3 using the sratoolkit download the fastq files from SRA and put them in the fastq folder
 #    3.4 put the metadata in the metadata folder
 # 4. if you are using data deliveded by Novogene
-#    4.1 put the folder you received from Novogene in the data folder
+#    4.1 put the folder you received from Novogene in the project folder
 #    4.2 create the filtred and metadata folders within the data folder
 #    4.3 put the metadata in the metadata folder; the first column must match 
 #        sample names (as received from Novogene, these are also the names of 
@@ -127,6 +129,7 @@ if(use_primer_table){
         dplyr::filter(primer_f_name == primerf_name) |>
         pull(primer_f_seq) |>
         unique()
+      if(length(fprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
       if(fprimer_from_table == primerf_seq){
         cat("\nThe sequence of your forward primer matches the forward primer name\n")
       } else {
@@ -142,6 +145,7 @@ if(use_primer_table){
         dplyr::filter(primer_r_name == primerr_name) |>
         pull(primer_r_seq) |>
         unique()
+      if(length(rprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
       if(rprimer_from_table == primerr_seq){
         cat("\nThe sequence of your reverse primer matches the reverse primer name\n")
       } else {
@@ -205,12 +209,15 @@ if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 # Uni340F (5′ CCTACGGGRBGCASCAG-3′) 17 bp and Bac806R (5′GGACTACYVGGGTATCTAAT 3′) 20 bp
 # 357 F (5’-CTCCTACGGGAGGCAGCAG-3’) 19 bp and 939R (5’-CTTGTGCGGGCCCCCGTCAATTC-3’) 23 bp - 605 bp
 # F341	(ACTCCTACGGGRSGCAGCAG) 20 bp and	R806	(GGACTACVVGGGTATCTAATC) 21 bp
+# Bakt_341F_Nov CCTAYGGGRBGCASCAG 17 bp, Bakt_805R_Nov GGACTACNNGGGTATCTAAT 20 bp (primers used by Novogene)
 #
 # V4
 # 515F (5'- GTGCCAGCMGCCGCGGTAA-3' ) 19 bp and 806R (5' -GGACTACHVGGGTWTCTAAT-3’) 20 bp length  311 bp
 # 515 F (5′- GTGBCAGCMGCCGCGGTAA - 3′) (Hugerth et al., 2014) and Pro--mod-805 R (5′-GACTACNVGGGTMTCTAATCC - 3′) 21 bp length 310 bp
 #
 # V4-V5 (515F, 5′-GTGCCAGCMGCCGCGGTAA-3′ 19 bp; 926R, 5′-CCGTCAATTCMTTTRAGT-3′  18 bp 429 bp)
+# 515F_3 (5'-GTGNCAGCMGCCGCGGTAA) 19 bp; 907R, (5'-CCGYCAATTYMTTTRAGTTT-3') 20 bp 412 bp
+
 # Primers: --------------------------------------------
   
 
@@ -343,10 +350,19 @@ if(use_accn_list) {
 
 if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
 
-if(all(sample.names %in% samdf$Run)){
-  cat("\nsamples in fastq files match samples in metadata\n")
-} else {
-  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+if(data_type == "sra"){
+  if(all(sample.names %in% samdf$Run)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
+} else{
+  # ad hoc for your data
+  if(all(sample.names %in% samdf$Library_name)){
+    cat("\nsamples in fastq files match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
+  }
 }
 
 
@@ -780,6 +796,14 @@ if(play_audio) beep(sound = sound_n)
 # If paired end, when possible merge together the inferred forward and reverse sequences.
 # with a good overlap (30 bp)
 # set verbose = F if you want less output
+# merge_option (only for compatibility with the log output, used for ITS only)
+# "fwd" will only use forward sequences (it is actually the same as operating on 
+# non-paired end sequences
+# "merge" will attemt a merge on all sequences
+# with this option no tree is returned
+# minO and maxM are the minimum overlap and max mismatch
+merge_option <- "merge"
+
 
 if(paired_end){
   if(keep_time) tic("\nmerging paired ends")
@@ -996,8 +1020,7 @@ if(play_audio) beep(sound=6)
 
 # create a column with row names 
 
-taxtab2 <- as_tibble(rownames_to_column(as.data.frame(taxtab, 
-                                                      stringsAsFactors = F), "ASV"))
+taxtab2 <- as_tibble(taxtab, rownames ="ASV")
 if(!"Species" %in% colnames(taxtab)) taxtab2$Species <- NA_character_
 
 # may be in the future add a variable with the Study, just to merge the database of ASVs
@@ -1048,9 +1071,15 @@ save.image(file = str_c(Study,".Rdata"))
 # colnames(taxtab) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
 
 # save a smaller version of workspace which will be needed later
-save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
-     primer_f, primer_r, target1, target2, taxtab2, 
-     file = str_c(Study,"_small.Rdata"))
+if(use_cutadapt){
+  save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
+       primer_f, primer_r, target1, target2, taxtab2, primer_occ, primer_occ_2,
+       file = str_c(Study,"_small.Rdata"))
+} else {
+  save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
+       primer_f, primer_r, target1, target2, taxtab2,
+       file = str_c(Study,"_small.Rdata"))
+}
 if (play_audio) beep(sound = sound_n)
 
 
@@ -1198,25 +1227,52 @@ save.image(file = str_c(Study,"_small.Rdata"))
 seq_sums <- rowSums(seqtab.nochim)
 runs_to_keep <- which(seq_sums>0)
 runs <- rownames(seqtab.nochim)[runs_to_keep]
-if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
-  seqtab.nochim <- seqtab.nochim[runs_to_keep,]
-  samdf <- dplyr::filter(samdf, Run %in% runs)
+# you may need to adapt this code
+if(data_type == "sra") {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Run %in% runs)
+  }
+} else {
+  if(length(runs_to_keep) < dim(seqtab.nochim)[1]) {
+    seqtab.nochim <- seqtab.nochim[runs_to_keep,]
+    samdf <- dplyr::filter(samdf, Library_Name %in% runs)
+  }
 }
 
 # sanity check
-if(all(rownames(seqtab.nochim) %in% samdf$Run)){
-  cat("\nsamples in sequence table match samples in metadata\n")
+# you may need to adapt this code
+if(data_type == "sra") {
+  if(all(rownames(seqtab.nochim) %in% samdf$Run)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 } else {
-  cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  if(all(rownames(seqtab.nochim) %in% samdf$Library_Name)){
+    cat("\nsamples in sequence table match samples in metadata\n")
+  } else {
+    cat("\nWARNING samples in sequence table DO NOT match samples in metadata\n")
+  }
 }
 # rownames(seqtab.nochim) <- sapply(strsplit(rownames(seqtab.nochim), "_", fixed = T), `[`, 1)
 
 # add final number of sequences and number of issues from track2
-samdf <- left_join(samdf, select(track2, Run = sample_name, n_reads2 = nonchim, 
-                                 n_issues))
+# you may need to adapt this code
+if(data_type == "sra") {
+  samdf <- left_join(samdf, select(track2, Run = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+} else {
+  samdf <- left_join(samdf, select(track2, Library_Name = sample_name, n_reads2 = nonchim, 
+                                   n_issues))
+}
 
 samdf <- as.data.frame(samdf)
-rownames(samdf) <- samdf$Run
+if(data_type == "sra"){
+  rownames(samdf) <- samdf$Run
+} else {
+  rownames(samdf) <- samdf$Library_Name
+  }
 
 # a transposed sequence table
 seqtab_t = t(seqtab.nochim)
@@ -1271,8 +1327,8 @@ read_length <- round(mean(nchar(rownames(ttab)), na.rm = T))
 
 # adapt this or set manually a comma delimited string of countries.
 loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
-                    str_c(list_flatten(as.list(distinct(samdf, geo_loc_name_country))), collapse =", "),
-                    NA_character_)
+                   str_flatten(pull(distinct(samdf, geo_loc_name_country)), collapse =", "),
+                   NA_character_)
 
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
@@ -1291,8 +1347,9 @@ write_tsv(study, str_c(Study,"_study.txt"))
 
 samples <- samples %>%
   mutate(description = str_c(env_local_scale, geo_loc_name, Library.Name, sep =", "))
-samples <- samples %>%
-  mutate(Sample_Name = Run) 
+if(data_type == "sra"){
+  samples <- samples %>%
+    mutate(Sample_Name = Run) }
 
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
@@ -1321,7 +1378,7 @@ if(data_type == "sra"){
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
            biosample = Sample_code, geo_loc_country = Country, 
-           geo_loc_continent = Continent, lat_lon)
+           geo_loc_continent = Continent, lat_lon, Sample_Name)
 }
 
 
@@ -1521,20 +1578,33 @@ if(use_logr){
                   primerfseq = FWD.orients,
                   primerrseq = REV.orients)
   log_print(primers, console = F)
-  handling_primers <- list(
-    checkprimers <- check_primers,
-    usecutatpt <- use_cutadapt,
-    primer_occ_pre = primer_occ,
-    primer_occ_post = primer_occ_2
-  )
+  if(use_cutadapt){ 
+    list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt,
+      primer_occ_pre = primer_occ,
+      primer_occ_post = primer_occ_2
+    )
+  } else{
+    handling_primers <- list(
+      checkprimers = check_primers,
+      usecutatpt = use_cutadapt
+    )
+  }
   log_print(handling_primers, console = F)
   log_print(filter_and_trim_par, console = F)
-  merge_opt <- list(
+  if(paired_end) {merge_opt <- list(
     pend = paired_end,
     ovl = overlapping,
+    mrgopt = merge_option,
     max_mismatch = maxM,
-    min_ovlap = minO
-  )
+    min_ovlap = minO)} else {
+      merge_opt <- list(
+        pend = paired_end,
+        ovl = overlapping,
+        mrgopt = merge_option)
+    }
+  
   dotree
   log_close()
 }
