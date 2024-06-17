@@ -1579,7 +1579,7 @@ if(use_logr){
                   primerrseq = REV.orients)
   log_print(primers, console = F)
   if(use_cutadapt){ 
-    list(
+    handling_primers <- list(
       checkprimers = check_primers,
       usecutatpt = use_cutadapt,
       primer_occ_pre = primer_occ,
