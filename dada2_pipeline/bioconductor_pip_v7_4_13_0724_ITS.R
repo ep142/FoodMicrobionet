@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for 16S, modified, v7_2_7, 03/2024
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.13, 18/07/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -6,38 +6,47 @@
 # samples, but even 100  can be processed depending on RAM) of amplicon targeted 
 # metagenomic data for fungi using the DADA2 pipeline 
 # https://benjjneb.github.io/dada2/tutorial.html
+# with modifications for ITS analysis 
+# https://benjjneb.github.io/dada2/ITS_workflow.html
 # and to carry out further processing needed to ready the output for import
-# into FoodMicrobionet
+# into FoodMicrobionet (https://github.com/ep142/FoodMicrobionet)
 
 # This version of the script includes options for both data downloaded from NCBI
 # SRA and data obtained from Novogene UK Ltd. There are also options for
 # single end/paired end data sets obtained with Illumina or 454 or Ion Torrent
-# In addition it includes a workaround for quality binned fastq described here:
-# https://github.com/benjjneb/dada2/issues/791
-# SILVA v138.1 is used as a taxonomic reference data base
+# In addition it includes a workaround for binned quality fastq described here:
+# https://github.com/benjjneb/dada2/issues/791 and a workaround for  handling
+# ITS sequences which do not merge properly due to excess length described here:
+# https://github.com/benjjneb/dada2/issues/537
+# in this version UNITE general release for fungi with singletons is used as a taxonomic reference
 # Finally, the script assembles an object which can be used in the future for
 # redoing the taxonomic assignment in an automated way
 
 # to use this script
-# 1. copy the script to a new folder and create a RStudio project
+
+# 1. copy the script to a new folder and create a RStudio project; the directory 
+#    containing the project folder must also contain the bioconductor_pip_ITS_functions.R
+#    file and the primer_pairs_fungi.txt file (see below)
 # 2. create a new folder called data
 # 3. if you are using data downloaded from NCBI SRA
 #    3.1 inside the folder data create three folders: fastq, filtered, metadata
 #    3.2 download from SRA the accession list and the study metadata for the
-#        any study you want to process (must be 16S) 
+#        any study you want to process (must be ITS) 
 #    3.3 using the sratoolkit download the fastq files from SRA and put them in the fastq folder
 #    3.4 put the metadata in the metadata folder
-# 4. if you are using data deliveded by Novogene
+# 4. if you are using data delivered by Novogene
 #    4.1 put the folder you received from Novogene in the project folder
-#    4.2 create the filtred and metadata folders within the data folder
+#    4.2 create the filtered and metadata folders within the data folder
 #    4.3 put the metadata in the metadata folder; the first column must match 
 #        sample names (as received from Novogene, these are also the names of 
 #        the folders containing the sequences)
-# 5. download the most recent taxonomy reference files from https://benjjneb.github.io/dada2/training.html
+# 5. download the most recent taxonomy reference files from 
+#    https://benjjneb.github.io/dada2/training.html
 #    and put them in a folder called taxdb at the same level of the directory containing your project
-# 6. an optional table with commonly used primer pairs can be downloaded from our repository
-#    primer_pairs_bacteria.txt and is used by a function to check primers; it should be placed
-#    in the folder containing the folder of your project and the taxonomic reference folder
+# 6. an optional table with commonly used primer pairs (primer_pairs_fungi.txt) 
+#    can be downloaded from our repository and is used by a function to 
+#    check primers; it should be placed in the folder containing the folder of 
+#.   your project and the taxonomic reference folder.
 # 7. make sure you have all the information you need (primers, platform, region, etc.)
 
 # If you want to use cutadapt to remove primers install it using miniconda
@@ -49,7 +58,7 @@
 # Install/load packages ---------------------------------------------------
 
 .cran_packages <- c("tidyverse", "parallel", "beepr", "tictoc", "reticulate", 
-                    "logr", "crayon")
+                    "logr", "R.utils", "crayon")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "DECIPHER", "phangorn", 
                     "BiocStyle", "ShortRead")
 
@@ -80,14 +89,15 @@ r_version <- R.Version() # in the future may be check that the version running i
 session_info <- sessionInfo()
 
 # other setup operations ------------------------------------------------
+
 opar <- par(no.readonly=TRUE) 
 par(ask=F) 
 # set.seed(1234) 
 # plays audio notifications if TRUE
 play_audio <- T
+sound_n = 6 # an integer from 1 to 11, sets the notification sound
 # keeps record of duration of important steps if TRUE
 keep_time <- T
-sound_n = 6 # an integer from 1 to 11, sets the notification sound
 # verbose output: will print additional objects and messages if TRUE
 verbose_output <- T
 # do you want to use a log to store the options you used in processing?
@@ -98,141 +108,85 @@ use_logr <- ifelse(verbose_output, T, F)
 
 if(play_audio) beep(sound = sound_n) # the notification you will hear
 
-# standard options: you have to change this manually if you want to do otherwise
+# standard options for handling primers: you have to change this manually 
+# if you want to do otherwise
 check_primers <- "auto" # "visually" if you want to do visually, "auto" otherwise
 use_cutadapt <- T # use cutadapt to remove primers, takes time and space, use wisely
 use_primer_table <- T # uses a primer table to check if the primer sequences are OK
-# put the location of your primer table inside this if (if you want to go
-# two levels above use ".." twice in file.path())
+# put the location of your primer table inside this if
+# hint: if the file is two levels up just duplicate ".." below
 if(use_primer_table){
-  primer_table_path <- file.path("..", "primer_pairs_bacteria.txt")
+  primer_table_path <- file.path("..", "primer_pairs_fungi.txt")
 }
 
-#  functions --------------------------------------------------------------
+# functions ---------------------------------------------------------------
 
-# this function is only defined if you use a primer table
-if(use_primer_table){
-  double_check_primers <- function(primer_file = primer_table_path, 
-                                   primerf_name, primerf_seq, primerr_name, primerr_seq){
-    # is the primer file there?
-    if(!file.exists(primer_table_path)) stop("Your primer table is not where you told me...")
-    primer_table <- read_tsv(primer_table_path)
-    # check the forward name
-    primerf_n <- unique(pull(primer_table, primer_f_name))
-    primerr_n <- unique(pull(primer_table, primer_r_name))
-    if(!primerf_name %in% primerf_n) {
-      warning("the name of your forward primer is not in the table you provided")
-    } else {
-      cat("\nThe name of your forward primer is in the table you provided\n")
-      # check the sequence
-      fprimer_from_table <- primer_table |>
-        dplyr::filter(primer_f_name == primerf_name) |>
-        pull(primer_f_seq) |>
-        unique()
-      if(length(fprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
-      if(fprimer_from_table == primerf_seq){
-        cat("\nThe sequence of your forward primer matches the forward primer name\n")
-      } else {
-        warning("the sequence of your forward primer does not match with the table")
-      }
-    }
-    if(!primerr_name %in% primerr_n) {
-      warning("the name of your forward primer is not in the table you provided")
-    } else {
-      cat("\nThe name of your reverse primer is in the table you provided\n")
-      # check the sequence
-      rprimer_from_table <- primer_table |>
-        dplyr::filter(primer_r_name == primerr_name) |>
-        pull(primer_r_seq) |>
-        unique()
-      if(length(rprimer_from_table)>1) stop("\nYou have more than one sequence associated to the primer name in the primer table.\n")
-      if(rprimer_from_table == primerr_seq){
-        cat("\nThe sequence of your reverse primer matches the reverse primer name\n")
-      } else {
-        warning("the sequence of your reverse primer does not match with the table")
-      }
-    }
-    if(primerf_name %in% primerf_n & primerr_name %in% primerr_n){
-      primer_line_df <- dplyr::filter(primer_table, primer_f_seq == primer_f_seq & primer_r_seq == primerr_seq)
-      if(nrow(primer_line_df) == 0) warning(" I cannot locate your primer pair, check your primers or  primer table (names, sequences)...")
-    }
-  }
-}
-
-# create different orientations of the primers
-allOrients <- function(primer) {
-  # Create all orientations of the input sequence
-  require(Biostrings)
-  dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
-  orients <- c(Forward = dna, Complement = Biostrings::complement(dna), Reverse = Biostrings::reverse(dna),
-               RevComp = Biostrings::reverseComplement(dna))
-  return(sapply(orients, toString))  # Convert back to character vector
-}
+# this will load three functions which are going to be used in the pipeline
+# this file should be in the folder containing your project directory
+# otherwise you need to change the path
+# hint: if the source files is two levels up just duplicate ".." below
+source(file.path("..","bioconductor_pip_ITS_functions.R"))
 
 # study metadata ----------------------------------------------------------
 
-# change his as appropriate
+# change this as appropriate
 data_type <- "sra" 
-# alternatives are sra, for data downloaded from sra
-# novogene_raw, for data obtained from novogene, with primer not removed
-# novogene_clean, for data obtained from novogene, data with primer removed
+# alternatives are "sra", for data downloaded from sra
+# "novogene_raw", for data obtained from novogene, with primer not removed
+# "novogene_clean", for data obtained from novogene, data with primer removed
 
 # creating information for the study and sample data frames
 # when using data other than those downloaded from SRA replace
 # the accession number with whichever identifier you want to use
 
-Study <- "ERP374375" # PRJNA836096 also includes fungi but with a different bioproject
-target <- "16S RNA gene" # alternatives are 16S RNA, 16S RNA gene and 
-# if ITS analysys was performed for the same study ITS and 16S RNA gene
-region <- "V3-V4" # or ITSx and Vx
+Study <- "SRP108314" # PRJNA388367
+target <- "ITS region and 16S RNA gene" # or ITS region and 16S RNA gene (or 16S RNA)
+region <- "ITS2 and V3-V4" # or ITSx and Vx
 seq_accn <- Study
-DOI <- "10.1016/j.lwt.2022.113680"
+DOI <- "10.1016/j.micres.2017.09.004"
 
 # information on the platform and arrangement
 
-platform <- "Illumina_HiSeq" #  (or set to "Illumina_miseq", "Illumina_novaseq", "Illumina_HiSeq" or "Ion_Torrent" or "F454")
-
+platform <- "Illumina_miseq" # (or set to "Illumina_miseq", "Illumina_novaseq", "Illumina_HiSeq", "Illumina_iSeq" or "Ion_Torrent" or "F454")
+# 
 paired_end <- T # set to true for paired end, false for single end or in the case of clean, merged seqs
 if (!paired_end) overlapping <- T # needed to run species assignment for SILVA
 
-# Primers: --------------------------------------------
+# Primers --------------------------------------------
+# all in standard 5'-3' orientation
+# ITS1:
+# ITS1-F_KYO2 (18S SSU 1733–1753) TAGAGGAAGTAAAAGTCGTAA 21 bp and ITS2_KYO2 (5.8 2046–2029) CTHGGTCATTTAGAGGAASTAA 22 bp
+# (Toju et al., 2012)
+# ITS1FI2 GAACCWGCGGARGGATCA (18 bp) and 5.8S CGCTGCGTTCTTCATCG (17 bp)
+# BITS ACCTGCGGARGGATCA (18 bp) and B58S3 GAGATCCRTTGYTRAAAGTT (20 bp)  (Bokulich and Mills, 2013)
+# ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCGTAGGTGAACCTGCGG (19 bp)
+# ITS5F GGAAGTAAAAGTCGTAACAAGG (22 bp)	ITS1R	GCTGCGTTCTTCATCGATGC (20 bp)
+# ITS1F TTGGTCATTTAGAGGAAGTAA (21 bp) ITS2 GCTGCGTTCTTCATCGATGC (20 bp)
+# ITS1Fv2 CTTGGTCATTTAGAGGAAGTAA (22 bp) ITS1R GCTGCGTTCTTCATCGATGC (20 bp) (White et al., 1990)
 
-# V1-V3 
-# Gray28F (5′-TTTGATCNTGGCTCAG) 16 bp and Gray519r (5′-GTNTTACNGCGGCKGCTG) 18 bp, 509 bp
-# 27F 5′ AGAGTTTGATCMTGGCTCAG3’ — 519R 5′ GWATTACCGCGGCKGCTG3′
-# 
-# V3-V4
-# S-D-Bact-0341-b-S-17/S-d-Bact-0785-a-A-21 primer pair with an amplicon size of 464 bp (Klindworth et al., 2012; 
-# also known as Bakt_341F/Bakt_805R primer pair designed by Sinclair et al. (2015)
-# forward CCTACGGGNGGCWGCAG 17 bp 
-# reverse GACTACHVGGGTATCTAATCC 21 bp
-# Uni340F (5′ CCTACGGGRBGCASCAG-3′) 17 bp and Bac806R (5′GGACTACYVGGGTATCTAAT 3′) 20 bp
-# 357 F (5’-CTCCTACGGGAGGCAGCAG-3’) 19 bp and 939R (5’-CTTGTGCGGGCCCCCGTCAATTC-3’) 23 bp - 605 bp
-# F341	(ACTCCTACGGGRSGCAGCAG) 20 bp and	R806	(GGACTACVVGGGTATCTAATC) 21 bp
-# Bakt_341F_Nov CCTAYGGGRBGCASCAG 17 bp, Bakt_805R_Nov GGACTACNNGGGTATCTAAT 20 bp (primers used by Novogene)
-#
-# V4
-# 515F (5'- GTGCCAGCMGCCGCGGTAA-3' ) 19 bp and 806R (5' -GGACTACHVGGGTWTCTAAT-3’) 20 bp length  311 bp
-# 515 F (5′- GTGBCAGCMGCCGCGGTAA - 3′) (Hugerth et al., 2014) and Pro--mod-805 R (5′-GACTACNVGGGTMTCTAATCC - 3′) 21 bp length 310 bp
-#
-# V4-V5 (515F, 5′-GTGCCAGCMGCCGCGGTAA-3′ 19 bp; 926R, 5′-CCGTCAATTCMTTTRAGT-3′  18 bp 429 bp)
-# 515F_3 (5'-GTGNCAGCMGCCGCGGTAA) 19 bp; 907R, (5'-CCGYCAATTYMTTTRAGTTT-3') 20 bp 412 bp
+# ITS2: 
+# ITS3F GCATCGATGAAGAACGCAGC ITS4R TCCTCCGCTTATTGATATGC 
+# (White TJ, Bruns TD, Lee SB, Taylor JW (1990) Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315–322)
+# ITS86F GTGAATCATCGAATCTTTGAA (21 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
+# ITS3f GCATCGATGAAGAACGCAGC (20 bp) and ITS4-KYO1 TCCTCCGCTTWTTGWTWTGC (20 bp) Toju et al., 2012
+# F2045 GCATCGATGAAGAACGCAGC (20 bp) and R2390 TCCTCCGCTTATTGATATGC (20 bp)
+# ITS3-KYO2 GATGAAGAACGYAGYRAA (18 bp)) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
-# Primers: --------------------------------------------
-  
+# ITS1 5.8S and ITS2:
+# ITS1 TCCGTAGGTGAACCTGCGG (19 bp) and ITS4 TCCTCCGCTTATTGATATGC (20 bp)
 
-# expected amplicon length 469 including primers
-primer_f <- "F341" # ACTCCTACGGGRSGCAGCAG
-primer_r <- "R806"  # GGACTACVVGGGTATCTAATC
+# expected amplicon length is variable
+primer_f <- "ITS3-KYO2" # 18 bp
+primer_r <- "ITS4"  # 20 bp
 
 # NOTE: be extra careful in indicating primer sequences because this will affect
 # primer detection and primer removal by cutadapt
 
-FWD <- "ACTCCTACGGGRSGCAGCAG"  ## CHANGE THIS to your forward primer sequence
-REV <- "GGACTACVVGGGTATCTAATC"   ## CHANGE THIS to your reverse primer sequence
+FWD <- "GATGAAGAACGYAGYRAA"  ## CHANGE THIS to your forward primer sequence
+REV <- "TCCTCCGCTTATTGATATGC" ## CHANGE THIS to your reverse primer sequence
 
-target1 <- "16S_DNA" # or 16S_RNA
-target2 <- region # or if the region is ITSx + Vx specify only the bacterial target region
+target1 <- "ITS_DNA"
+target2 <- region
 
 # if you have set correctly your options this should not return any warning
 # but will return details on the primer table in the console
@@ -241,10 +195,11 @@ if(use_primer_table) double_check_primers(
   primerf_seq = FWD, primerr_seq = REV
 )
 
-# create different orientations of the primers
+# ad hoc: in this case the region covered by the primers is quite long
+# be careful with merging and if it fails set overlapping <- F
+
 (FWD.orients <- allOrients(FWD))
 (REV.orients <- allOrients(REV))
-
 
 # create sub-directory ----------------------------------------------------------
 # sub-directory data must already be in the wd
@@ -313,17 +268,16 @@ if(data_type == "novogene_raw"){
 
 # path to the metadata file (needs to be adapted)
 metadata_path <- file.path("data", "metadata", "SraRunTable.txt") 
-# alternatives when using data downloades from NCBI SRA are:
+# alternatives when using data downloads from NCBI SRA are:
 # "data/metadata/SraRunInfo.txt" 
 # "data/metadata/SraRunTable.txt.csv"
 # "data/metadata/SraRunTable.txt"
 samdf <- read_tsv(metadata_path) 
 if(ncol(samdf)==1) samdf <- read_csv(metadata_path)
-
 # have a look at the sample data:
 # if both bacteria and yeasts are detected, you should generate an accession list for filtering
 # the following is an example of code for creating accession lists
-# the metadata are poor; the fist 18 runs are bacteria, the others are fungi
+
 run_acc_list_code <- F
 if(run_acc_list_code){
   acc_list_bacteria <- samdf |>
@@ -338,8 +292,10 @@ if(run_acc_list_code){
   write_tsv(acc_list_fungi, file = "acc_list_fungi.txt")
 }
 
+# use accession list to control which sequences will be processed
+# only sequences in the accn_list file will be processed
 use_accn_list <- F
-accn_list_name <- "acc_list_bacteria.txt" # need to adapt this to your own file
+accn_list_name <- "acc_list_fungi.txt" # need to adapt this to your own file
 if(use_accn_list) {
   accn_list <- pull(read_tsv(accn_list_name, col_names = F),1)
   seq_to_process <- sample.names %in% accn_list
@@ -358,7 +314,7 @@ if(data_type == "sra"){
   }
 } else{
   # ad hoc for your data
-  if(all(sample.names %in% samdf$Library_name)){
+  if(all(sample.names %in% samdf$Library_Name)){
     cat("\nsamples in fastq files match samples in metadata\n")
   } else {
     cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
@@ -373,6 +329,13 @@ if(data_type == "sra"){
 # check_primers <- "auto" 
 
 # sequences will sampled and shown here as a double check
+
+# check carefully if primer occur in the right position: 
+# the forward primer  should appear at the beginning of forward sequences 
+# the reverse primer should occur at the beginning of reverse sequences (if any)
+# extra nt may occasionally be present
+# if you have chosen to check primer visually take note now of their occurrence 
+# and the length of the forward and reverse sequence to trim at the 5' end
 
 if(keep_time) tic("\nReading sequences")
 # check for occurrence of primers and adapters on a sample of forward and
@@ -399,16 +362,8 @@ if(paired_end){
   ave_seq_length <- mean(c(ave_seq_length_f, ave_seq_length_r))
 }
 
-# check carefully if primer occur in the right position: 
-# the forward primer  should appear at the beginning of forward sequences 
-# the reverse primer should occur at the beginning of reverse sequences (if any)
-# extra nt may occasionally be present
-# if you have chosen to check primer visually take note now of their occurrence 
-# and the length of the forward and reverse sequence to trim at the 5' end
-
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
-
 
 #  check primers automatically --------------------------------------------
 
@@ -433,7 +388,7 @@ if(check_primers == "auto") {
   # count the occurrence of primers
   primerHits <- function(primer, fn) {
     # Counts number of reads in which the primer is found
-    nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+    nhits <- vcountPattern(primer, sread(ShortRead::readFastq(fn)), fixed = FALSE)
     return(sum(nhits > 0))
   }
   if(paired_end){
@@ -455,12 +410,11 @@ if(check_primers == "auto") {
   # end of forward sequences
 }  
 
-
 #  use cutadapt -----------------------------------------------------------
 cat("\n", "the use_cutadapt flag is set to ", use_cutadapt) 
+cat("\n", "if you want to change the use_cutadapt do it below")
 beep()
-cat("if you want to change the use_cutadapt do it below")
-
+# no primers except for a few sequences
 # use_cutadapt <- !use_cutadapt
 
 # make sure you set the location of cutadapt correctly
@@ -476,8 +430,13 @@ if(use_cutadapt){
   wd <- getwd()
   wd
   # need to do this because I will change the wd and then restore it
+  if(exists("fnFs.cut")) rm(fnFs.cut) # needed to prevent problems if you rerun the script
   fnFs.cut <- file.path(wd, path.cut, basename(fnFs))
-  if(paired_end) fnRs.cut <- file.path(wd, path.cut, basename(fnRs))
+  if(paired_end) {
+    if(exists("fnRs.cut")) rm(fnRs.cut)
+    fnRs.cut <- file.path(wd, path.cut, basename(fnRs))
+  }
+  
   fnFs.filtN <- file.path(wd, fnFs.filtN)
   if(paired_end) fnRs.filtN <- file.path(wd, fnRs.filtN)
   # you need to set this to the directory containing your miniconda environments
@@ -534,7 +493,6 @@ if(use_cutadapt){
   if(paired_end){
     sampleRs <- if(length(cutRs)>=6) sample(cutRs,6) else fnRs[1:length(cutRs)]
   }
-  
   if(play_audio) beep(sound = sound_n)
   if(keep_time) toc()
 }
@@ -547,14 +505,10 @@ if(use_cutadapt){
 # creates quality profile plots --------------------------------
 
 if(keep_time) tic("\ncreate quality profile plots")
-if(use_cutadapt){
-  sampleFs <- if(length(cutFs)>=6) sample(cutFs,6) else cutFs[1:length(cutFs)]
-  if(paired_end){
-    sampleRs <- if(length(cutRs)>=6) sample(cutRs,6) else fnRs[1:length(cutRs)]
-  }
-}
 
 # adapt this if you want to pick specific runs
+# you should be able to determine from quality profiles if the quality scores are binned
+
 plot_x_limit <- round(ave_seq_length/50)*50+25
 toplot_fwd <- sampleFs
 qplotfwd <- plotQualityProfile(toplot_fwd) +
@@ -582,8 +536,11 @@ if(paired_end){
   qplotrev
 }
 
-# sequences are merged and some quality process has bee carried out
-# primers and adapters removed
+rm(myFwsample)
+if (paired_end) rm(myRvsample)
+
+# HINT make a note here of what you have done for reproducibility reasons: 
+# primers have been removed
 
 # save and remove object which won't be needed
 if(paired_end){
@@ -601,67 +558,70 @@ save.image(file = str_c(Study,".Rdata"))
 if(keep_time) toc()
 if(play_audio) beep(sound = sound_n)
 
+# may be they have been quality processed
 
 # filtering and trimming --------------------------------------------------
 
 # creates directory data/filtered if it does not exist
 if(!file_test("-d", filt_path)) dir.create(filt_path)
+
 # creates file paths for filtered sequences
+
 filtFs <- file.path(filt_path, basename(fnFs))
 
-if(paired_end) filtRs <- file.path(filt_path, basename(fnRs))
-
+if(paired_end) {filtRs <- file.path(filt_path, basename(fnRs))}
 
 # truncf position at which forward sequences will be truncated
 # truncr idem for reverse
 # quality score 30 1 error in 100, 40 1 in 10000, 20 1 in 100
 # Novogene "clean" sequences are merged and quality processed, with primers removed
 # reverse not applicable here: in some cases it is better to remove a few nt from the end
-truncf<- 225
-truncr<- 225 # NULL if not paired end
-trim_left <- c(0,0) # use a length 2 vector c(x,y) if paired end or a single number if not
+# NOTE: with ITS for fungi you should aim at a sum of 500 bp between forward and reverse to have good merging
+truncf<- 0 # 0 in ITS
+truncr<- 0 # 0 if not paired end and ITS
+# the ITS DADA2 pipeline does not enforce a fixed length, but this might also result in removing too many
+# sequences due to poor quality at the 3' end
+trim_left = c(0,0) # use a length 2 vector c(x,y) if paired end or a single number if not
 if(platform == "Ion_Torrent") trim_left <- trim_left+15
 maxEEf = 2 # with very high quality data can be reduced to 1
 maxEEr = 5 # 2 very restrictive, 5 does well in most cases, not needed for single end
 trunc_q = 2 # with very high quality data can be increased up to 10-11
+min_length <- 50
 max_length <- 999 # not needed for Illumina and Ion Torrent, modify to max. exp. seq. length for F454
 filter_and_trim_par <- as.data.frame(cbind(truncf, truncr, trim_left, 
-                                           maxEEf, maxEEr, trunc_q, max_length))
+                                           maxEEf, maxEEr, trunc_q, 
+                                           max_length, min_length))
 
 # matchIDs = true if prefiltered in QIIME;
-
 if(use_cutadapt) {
   tofiltFs <- cutFs
 } else {
   tofiltFs <- fnFs
 }
-# paired end
 if(paired_end) {
   if(use_cutadapt) {tofiltRs <- cutRs
   } else {
     tofiltRs <- fnRs
   }
 }
-
-
+# paired end 
 out <- if(paired_end) {
   filterAndTrim(tofiltFs, filtFs, rev = tofiltRs, filt.rev = filtRs, 
                 truncQ=trunc_q,
-                truncLen=c(truncf,truncr),
                 trimLeft = trim_left,
                 maxN=0, maxEE=c(maxEEf,maxEEr), 
                 rm.phix=TRUE,  
                 compress=TRUE, 
+                minLen = min_length,
                 multithread=TRUE) 
   # On Windows set multithread=FALSE
 } else {
   # not paired end
-  max_length <- ifelse(max_length>truncf, Inf, max_length)
   out <- filterAndTrim(tofiltFs, filtFs, rev = NULL, filt.rev = NULL, 
                        truncQ=trunc_q,
-                       truncLen=truncf,
                        trimLeft = trim_left,
                        maxLen = max_length,
+                       minLen = min_length,
                        maxN=0, maxEE=maxEEf, 
                        rm.phix=TRUE,  
                        compress=TRUE, 
@@ -702,6 +662,8 @@ cat("After filtering there are between ",
     sep=""
     )
 
+# better save workspace here
+save.image(file = str_c(Study,".Rdata"))
 
 # learning error rates ----------------------------------------------------
 
@@ -796,38 +758,44 @@ if(play_audio) beep(sound = sound_n)
 # If paired end, when possible merge together the inferred forward and reverse sequences.
 # with a good overlap (30 bp)
 # set verbose = F if you want less output
-# merge_option (only for compatibility with the log output, used for ITS only)
+
+# merge options
+overlapping <- T # if F concatenation will be always performed
+# use overlapping <- F if you loose all or most sequences after merging
+minO = 25 # minimum overlap should be 20-30
+maxM = 0 # maximum mismatch should be 0
+# merge_option
 # "fwd" will only use forward sequences (it is actually the same as operating on 
 # non-paired end sequences
-# "merge" will attemt a merge on all sequences
+# "merge" will attempt a merge on all sequences
+# "mixed" will try to merge all sequence it can and concatenate the others
 # with this option no tree is returned
 # minO and maxM are the minimum overlap and max mismatch
-merge_option <- "merge"
+merge_option <- "mixed"
 
-
-if(paired_end){
-  if(keep_time) tic("\nmerging paired ends")
-  minO = 25 # should be 20-30
-  maxM = 0 # should be 0
-  overlapping <- F # set this to true if you think there is good overlap
-  # when  fwd and rev are not able to cover the full amplicon length
-  # with a given overlap
-  # justConcatenate = T adds 10 N between fwd and rev
-  if (overlapping){
-    mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, 
-                          maxMismatch = maxM,
-                          minOverlap = minO,
-                          verbose=TRUE)
-  } else {
+if(!paired_end | merge_option == "fwd"){
+  mergers <- dadaFs
+} else {
+  if(keep_time) tic("\nmerging or concatenating paired ends")
+  if (!overlapping){
+    # when  fwd and rev are not able to cover the full amplicon length
+    # with a given overlap justConcatenate = T adds 10 N between fwd and rev
     mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs,
                           justConcatenate = T,
                           verbose=TRUE)
+  } else {
+    if(merge_option == "merge"){
+      # does merging, can result in loss of longer sequences for ITS
+      mergers <- mergePairs(dadaFs, derepFs, dadaRs, derepRs, 
+                            maxMismatch = maxM,
+                            minOverlap = minO,
+                            verbose = TRUE)
+    
+      } else {
+      mergers <- mixed_merge()
+      }
+    if(keep_time) toc()
   }
-  
-  if(keep_time) toc()
-  
-} else {
-  mergers <- dadaFs
 }
 
 if(play_audio) beep(sound = sound_n)
@@ -865,12 +833,11 @@ if(keep_time) toc()
 
 # filter by size ----------------------------------------------------------
 
-# to remove sequences much shorter or longer than expected (approx 420-430 for 
-# V3-V4, 268-262 for V4, 388-392 for V4-V5 and 470-475 for V1-V3; shorter 
-# sequences are usually mitochondria). Needs to be inspected.
+# ITS sequences are naturally variable in length and should not be filtered
+# by length
 
-seqtab_f <- seqtab.all[,nchar(colnames(seqtab.all)) %in% seq(459, 461)]
-
+# seqtab_f <- seqtab.all[,nchar(colnames(seqtab.all)) %in% seq(284, 472)]
+seqtab_f <- seqtab.all
 filt_seqs <- sum(seqtab_f)/sum(seqtab.all) 
 
 # look at the abundance distribution
@@ -882,7 +849,8 @@ data.frame(nseqs = colSums(seqtab_f)) |>
     x = "log10(seq_count)", 
     y = "number of individual sequences"
   )
-# several singletons, will probably go away during chimera removal
+
+# singletons will probably go away during chimera removal
 
 save.image(file = str_c(Study,".Rdata"))
 
@@ -894,10 +862,11 @@ cat("\nThe number of sequences prior to bimera removal is:", dim(seqtab_f)[2],"\
 
 seqtab.nochim <- removeBimeraDenovo(seqtab_f, method="consensus", 
                                     multithread=TRUE, verbose=TRUE)
-beep(sound=6)
+beep(sound=sound_n)
 # better save workspace here
 save.image(file = str_c(Study,".Rdata"))
 # recheck length distribution and see if singletons are still there
+
 data.frame(nseqs = colSums(seqtab.nochim)) |>
   ggplot() +
   geom_histogram(mapping = aes(x= log10(nseqs))) +
@@ -907,13 +876,12 @@ data.frame(nseqs = colSums(seqtab.nochim)) |>
     y = "number of individual sequences"
   )
 
-if(keep_time) toc()
-
 # which ASVs are singletons or doubletons?
 single_double <- which(colSums(seqtab.nochim)<=2)
 length(single_double)/ncol(seqtab.nochim)
 # fraction of singletons+doubletons here 2.5% (remember, these are ASVs, not OTUs) 
 singletons <- which(colSums(seqtab.nochim)<=1)
+
 
 doubletons <- which(colSums(seqtab.nochim)==2)
 length(doubletons)
@@ -982,39 +950,23 @@ save.image(file = str_c(Study,"_small.Rdata"))
 
 # assign taxonomy ---------------------------------------------------------
 
-if(keep_time) tic("\nassign taxonomy, genus")
+if(keep_time) tic("\nassign taxonomy")
 
 taxdb_dir <- file.path("..","tax_db") # change this if the tax databases are elsewhere
-# use ".." twoce if the folder is two levels up
 list.files(taxdb_dir)
 
+# assignment with UNITE
+RC <- T # true by default
 
-# assignment with SILVA
-RC <- F # false by default
+# UNITE
+ref_fasta <- file.path(taxdb_dir, "sh_general_release_dynamic_s_04.04.2024.fasta")
 
-# SILVA
-ref_fasta <- file.path(taxdb_dir, "silva_nr99_v138_1_train_set.fa")
-taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE)
-# setting tryRC to T if there are too many sequences not identified at the phylum level
-if(mean(is.na(taxtab[,2]))>0.2) {
-  RC<-T
-  taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE, tryRC = RC)
-  }
+# the most recent release is sh_general_release_dynamic_s_04.04.2024.fasta 
 
-# optionally, if the sequences do not get identified, add the option tryRC=T
-# which also tries the reverse complement
+taxtab <- assignTaxonomy(seqtab.nochim, refFasta = ref_fasta, multithread = TRUE, 
+                         tryRC = RC)
+
 if(keep_time) toc()
-
-# do species assignment, DOES NOT WORK WITH JUST CONCATENATE
-
-if(!paired_end | overlapping){
-  if(keep_time) tic("\nassign taxonomy, species")
-  sp_ass_SILVA <- file.path(taxdb_dir, "silva_species_assignment_v138_1.fa")
-  taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = RC)
-  # optionally, if the sequences do not get identified, add the option tryRC=T
-  # which also tries the reverse complement
-  if(keep_time) toc()
-}
 
 if(play_audio) beep(sound=6)
 
@@ -1024,6 +976,15 @@ taxtab2 <- as_tibble(taxtab, rownames ="ASV")
 if(!"Species" %in% colnames(taxtab)) taxtab2$Species <- NA_character_
 
 # may be in the future add a variable with the Study, just to merge the database of ASVs
+# clean taxa
+taxtab2 <- taxtab2 %>%
+  mutate(Kingdom = str_remove(Kingdom, "k__"),
+         Phylum = str_remove(Phylum, "p__"),
+         Class = str_remove(Class, "c__"),
+         Order = str_remove(Order, "o__"),
+         Family = str_remove(Family, "f__"),
+         Genus = str_remove(Genus, "g__"),
+         Species = str_remove(Species, "s__"))
 
 taxtab2[is.na(taxtab2)] <- ""
 taxtab2 <- taxtab2 %>%
@@ -1040,7 +1001,8 @@ taxtab2 <- taxtab2 %>%
 
 # as an alternative you can use DECIPHER::IdTaxa, which has been reported to
 # be faster and more accurate than the naïve Bayesian classifier
-# NEED TO CHECK IF THIS WORKS; besides they still have the 2019 version of SILVA v138
+# NEED TO CHECK IF THIS WORKS and provide the right database
+# a number of training sets available here http://www2.decipher.codes/Downloads.html
 
 useIdTaxa <- F
 if(useIdTaxa){
@@ -1065,11 +1027,6 @@ if(useIdTaxa){
 rm(ref_fasta)
 save.image(file = str_c(Study,".Rdata"))
 
-# taxa can be cleaned with tidyr::separate
-
-# not run, unnecessary
-# colnames(taxtab) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
-
 # save a smaller version of workspace which will be needed later
 if(use_cutadapt){
   save(taxtab, seqtab.nochim, track2, Study, target, region, seq_accn, DOI,
@@ -1085,82 +1042,19 @@ if (play_audio) beep(sound = sound_n)
 
 # fixing bad taxa ---------------------------------------------------------
 
-# first fix taxa with ambiguous labels or potential duplicate labels
-
-# fix Incertae sedis (for Ruminococcaceae and Lachnospiraceae)
-
-pos_to_change <- which(taxtab2$Genus == "Incertae Sedis")
-if(length(pos_to_change)>0){
-  cat("\nfixing Incertae Sedis in genera")
-  taxtab2$Genus[pos_to_change] <- paste(taxtab2$Family[pos_to_change], taxtab2$Genus[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] }
-# fix "Unknown Family"
-pos_to_change <- which((taxtab2$Family == "Unknown Family") & (taxtab2$Genus == ""))
-if(length(pos_to_change)>0){
-  cat("\nfixing Unknown family")
-  taxtab2$Family[pos_to_change] <- paste(taxtab2$Order[pos_to_change], taxtab2$Family[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
-}
-# fix s_label == uncultured
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Class == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Class")
-  taxtab2$Class[pos_to_change] <- paste("uncultured", taxtab2$Phylum[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Class[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Order == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Order")
-  taxtab2$Order[pos_to_change] <- paste("uncultured", taxtab2$Class[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Order[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Family == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Family")
-  taxtab2$Family[pos_to_change] <- paste("uncultured", taxtab2$Order[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
-}
-pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Genus == "uncultured")
-if(length(pos_to_change)>0){
-  cat("\nfixing uncultured in Genus")
-  taxtab2$Genus[pos_to_change] <- paste("uncultured", taxtab2$Family[pos_to_change], sep = " ")
-  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] 
-}
-
-# do further fixes using a lookup table
-bad_taxa <- read_tsv(file.path(taxdb_dir,"SILVA_bad-taxa.txt"))
-
-if(any(pull(taxtab2, s_label) %in% pull(bad_taxa, s_label))){
-  cat("\nfixing bad taxa using lookup table")
-  colnames(bad_taxa) <- c("s_label", "new_kingdom", "new_phylum", "new_class", 
-                          "new_order", "new_family", "new_genus", "new_species")
-  taxtab2 <- left_join(taxtab2, bad_taxa)
-  taxtab2 <- taxtab2 %>%
-    mutate(Genus = ifelse(is.na(new_genus), Genus, new_genus),
-           Family = ifelse(is.na(new_family), Family, new_family),
-           Order = ifelse(is.na(new_order), Order, new_order),
-           Class = ifelse(is.na(new_class), Class, new_class),
-    ) %>%
-    select(-(new_kingdom:new_species))
-}
-
-
-# remove bad ides and mitochondria ----------------------------------------
+# remove bad ides  ----------------------------------------
 # which is the proportion of sequences with Kingdom only?
 nASVs <- nrow(taxtab2)
 nkingdom <- taxtab2 %>% dplyr::filter(Phylum == "") %>% nrow()
-f_nkingdom <-  nkingdom/nASVs
-# which is the proportion of ASVs attrobuted to mitochondria?
-nmito <- taxtab2 %>% dplyr::filter(Family == "Mitochondria") %>% nrow() 
-f_nmito <-  nmito/nASVs
-# quite low no need to filter
+(f_nkingdom <-  nkingdom/nASVs)
+
+# change as appropriate
 filter_ASVs <- F
 if(filter_ASVs){
   taxtab2_old <- taxtab2
   seqtab.nochim_old <- seqtab.nochim
   taxtab2 <- taxtab2 %>%
-    dplyr::filter(Phylum != "") %>%
-    dplyr::filter(Family != "Mitochondria")
+    dplyr::filter(Phylum != "")
   seqtab.nochim <- seqtab.nochim[,(colnames(seqtab.nochim) %in% taxtab2$ASV)]
 }
 
@@ -1174,8 +1068,15 @@ if(filter_ASVs){
 # but it is already prohibitive with 20k
 # and usually not worth the effort
 
-dotree <- T # avoid if overlapping == F
-if(dim(seqtab.nochim)[2]>10000 | overlapping == F) {dotree <- F}
+dotree <- F # avoid if overlapping == F
+
+if(merge_option == "mixed" & dotree == T){
+  cat(red("\nYour option for merging is 'mixed': do you really want to infer the phylogenetic tree?\n"))
+}
+
+if(dim(seqtab.nochim)[2]>10000 | overlapping == F) {
+  dotree <- F
+  }
 
 if (dotree) {
   if(keep_time) tic("\nbuilding the phylogenetic tree")
@@ -1186,7 +1087,6 @@ if (dotree) {
     DECIPHER::AlignSeqs(DNAStringSet(seqs),
                         anchor = NA,
                         processors = nc)
-  
   # The phangorn R package is then used to construct a phylogenetic tree.
   # Here we first construct a neighbor-joining tree, and then fit a GTR+G+I
   # (Generalized time-reversible with Gamma rate variation)
@@ -1333,7 +1233,7 @@ loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
                 read_length_bp = read_length, seq_center = seq_center,
-                tax_database = "SILVA v138_1", Seq_accn = seq_accn,
+                tax_database = "UNITE", Seq_accn = seq_accn,
                 samples = n_samples, DOI = DOI, geoloc = loc_list, 
                 primer_f, primer_r, overlapping, paired_end)
 # saves study info
@@ -1346,7 +1246,7 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c(env_local_scale, geo_loc_name, Library.Name, sep =", "))
+  mutate(description = str_c(SampleName, sep =", "))
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(Sample_Name = Run) }
@@ -1354,15 +1254,14 @@ if(data_type == "sra"){
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
 # use these if part or all of the geolocation information is missing
-# samples$geo_loc_name_country <- "France"
-# samples$geo_loc_name_country_continent <- "Europe"
-samples$lat_lon <- NA_character_
-
+# samples$geo_loc_name_country <- "your country here"
+# samples$geo_loc_name_country_continent <- "your continent here"
+# samples$lat_lon <- NA_character_
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
 # tidyr::separate)
 
-# needs to be adjusted ad hoc
+# need to be adjusted ad hoc
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(label2 = str_c("s.",Sample_Name), target1 = target1, 
@@ -1377,8 +1276,8 @@ if(data_type == "sra"){
            target2 = target2, SRA_Sample = NA_character_, 
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
-           biosample = Sample_code, geo_loc_country = Country, 
-           geo_loc_continent = Continent, lat_lon, Sample_Name)
+           biosample = Sample_code, geo_loc_country = geo_loc_name_country, 
+           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon, Sample_Name)
 }
 
 
@@ -1392,63 +1291,24 @@ write_tsv(samples, str_c(Study,"_samples.txt"))
 # some changes are necessary for coherence with FMBN taxonomy
 unique_tax <- taxtab2 %>% select(-ASV) %>% distinct()
 
-
-# if the tax database is silva v138 class changes are not needed
-
-if(!str_detect(study$tax_database, "v138")) {
-  taxa <- unique_tax %>%
-    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
-    mutate(Class = ifelse(Class == "Acidomicrobia", "Acidomicrobiia", Class)) %>%
-    mutate(Class = ifelse(Class == "Coriobacteria", "Coriobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Flavobacteria", "Flavobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Sphingobacteria", "Sphingobacteriia", Class)) %>%
-    mutate(Class = ifelse(Class == "Fusobacteria", "Fusobacteriia", Class)) %>%
-    mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
-                       str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
-                             Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
-           id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
-                          str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
-                                ";o__", Order,  ";f__", Family, ";g__", Genus, 
-                                ";s__", sp_label))) %>%
-    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
-    mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                            "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
-           taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                               "; o__", Order,  "; f__", Family, "; g__", Genus, 
-                               "; s__", sp_label)) %>%
-    mutate(Species = sp_label) %>%
-    select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
-  
-  # found a bug, need to fix labels for some taxa
-  taxa <- taxa %>% mutate(label = case_when(
-    Class == "Acidobacteria (class)" & label == "Acidobacteria" ~ "Acidobacteria (class)",
-    TRUE ~ label
-  ))
-  taxtab2 <- taxtab2 %>% mutate(s_label = case_when(
-    Class == "Acidobacteria (class)" & s_label == "Acidobacteria" ~ "Acidobacteria (class)",
-    TRUE ~ s_label
-  ))
-} else {
-  taxa <- unique_tax %>%
-    mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
-    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
-    mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
-                       str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
-                             Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
-           id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
-                          str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
-                                ";o__", Order,  ";f__", Family, ";g__", Genus, 
-                                ";s__", sp_label))) %>%
-    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
-    mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                            "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
-           taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                               "; o__", Order,  "; f__", Family, "; g__", Genus, 
-                               "; s__", sp_label)) %>%
-    mutate(Species = sp_label) %>%
-    select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
-}
-
+taxa <- unique_tax %>%
+  mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
+  mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
+  mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
+                     str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
+                           Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
+         id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
+                        str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
+                              ";o__", Order,  ";f__", Family, ";g__", Genus, 
+                              ";s__", sp_label))) %>%
+  mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
+  mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                          "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
+         taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                             "; o__", Order,  "; f__", Family, "; g__", Genus, 
+                             "; s__", sp_label)) %>%
+  mutate(Species = sp_label) %>%
+  select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
 
 write_tsv(taxa, str_c(Study, "taxaFMBN.txt"))         
 
@@ -1511,8 +1371,7 @@ FMBN_physeq_taxa <- as.matrix(column_to_rownames(unique_tax, var = "s_label"))
 FMBN_physeq <- phyloseq(otu_table(FMBN_physeq_OTU, taxa_are_rows = T), 
                         sample_data(samples),
                         tax_table(FMBN_physeq_taxa))
-saveRDS(FMBN_physeq,str_c("data/", Study, "_FMBN_ps.rds"))
-
+saveRDS(FMBN_physeq, str_c("data/", Study, "_FMBN_ps.rds"))
 
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
@@ -1552,6 +1411,7 @@ if(all(check_list)){
 
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
+
 
 #  save the log -----------------------------------------------------------
 # need to put it at the end of the script because if the script is used
@@ -1609,6 +1469,7 @@ if(use_logr){
   log_close()
 }
 
+
 # Package citations -------------------------------------------------------
 
 map(c(.cran_packages, .bioc_packages), citation)
@@ -1617,11 +1478,12 @@ map(c(.cran_packages, .bioc_packages), citation)
 # Credits and copyright ---------------------------------------------------
 
 # Most of the script is taken from https://benjjneb.github.io/dada2/tutorial.html
-# with some changes and adaptations
+# and https://benjjneb.github.io/dada2/ITS_workflow.html
+# with several changes and adaptations
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021, 2022, 2023, 2024 Eugenio Parente
+# Copyright 2024 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

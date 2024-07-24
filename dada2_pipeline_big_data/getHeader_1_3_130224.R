@@ -33,14 +33,54 @@ sessionInfo()
 platform <- "Illumina" # (or set to "Illumina" or "Ion_Torrent" or "F454")
 paired_end <- T # set to true for paired end, false for single end
 
-fastq_path <- file.path("data", "fastq")
+# change this as appropriate
+data_type <- "sra" 
+# alternatives are "sra", for data downloaded from sra
+# "novogene_raw", for data obtained from novogene, with primer not removed
+# "novogene_clean", for data obtained from novogene, data with primer removed
+
+# sub-directory data must already be in the wd
+if(data_type == "sra"){
+  fastq_path <- file.path("data", "fastq")
+  file_list <- list.files(fastq_path)
+  fns <- sort(list.files(fastq_path, full.names = TRUE))
+} else{
+  # this assumes that the only alternative is data from novogene
+  top_level_dir <- list.dirs(recursive = F)[str_detect(list.dirs(recursive = F), "result")]
+  data_dirs <- list.dirs(file.path(top_level_dir), recursive = F)
+  if(str_detect(data_type, "clean")){
+    paired_end<-F
+    fastq_dir <- data_dirs[str_detect(data_dirs,"Clean")]
+  } else {
+    paired_end<-T
+    fastq_dir <- data_dirs[str_detect(data_dirs,"Raw")]
+  }
+  fastq_dirs <- list.dirs(fastq_dir, recursive = F)
+  file_list <- vector("list",length = length(fastq_dirs))
+  for(i in seq_along(fastq_dirs)){
+    file_list[[i]]<-list.files(fastq_dirs[i])
+    if(str_detect(data_type, "clean")){
+      file_index <- which(str_detect(file_list[[i]], "effective.fastq.gz"))
+    } else {
+      # if you want the seqs without primer and adapter
+      # file_index <- which(!str_detect(file_list[[i]], "raw") & !str_detect(file_list[[i]], "Frags"))
+      file_index <- which(str_detect(file_list[[i]], "raw"))
+    }
+    file_list[[i]]<-file.path(
+      fastq_dirs[i],
+      file_list[[i]][file_index]
+    )
+  }
+  fns <- unlist(file_list)
+  file_list <- basename(unlist(file_list))
+}
+
 filt_path <- file.path("data", "filtered")
+
 # if(!file_test("-d", fastq_path)) {
 #  dir.create(fastq_path)
 # only needed if you want to create the directory and move the data from somewhere else
 
-
-fns <- sort(list.files(fastq_path, full.names = TRUE))
 if(paired_end){
   fnFs <- fns[grepl("_1", fns)]
   fnRs <- fns[grepl("_2", fns)]
@@ -75,10 +115,10 @@ beep(sound=6)
 # needs to be optimized depending on the separators
 
 identifiers <- as_tibble(myFwsample) %>%
-  separate(header, into = c("sample", "machine_lane", "length"), 
+  separate(header, into = c("sample", "machine_lane", "length_BP"), 
            sep = " ", remove = F) 
 # skip if necessary
-skip_flag <- T
+skip_flag <- F
 if(!skip_flag){
 identifiers <- identifiers %>% separate(machine_lane, into = c("mach_lane_1", "mach_lane_2"),
                                         sep = "-", remove = F) %>%
@@ -92,12 +132,13 @@ identifiers <- identifiers %>% separate(machine_lane, into = c("mach_lane_1", "m
 
 # adapt this as needed, you can comfortably analyze 60-100 samples in one run
 # make sure taht each group contains samples from a singli machine lane
-identifiers$analysis_order <- c(rep(1,60), rep(2,55))
+identifiers$analysis_order <- c(rep(1,60), rep(2,60), rep(3,60), rep(4,28))
 
 
 
 
 write_tsv(identifiers, file = "identifiers.txt")
+write_tsv(identifiers, file = "identifiers_copy.txt")
 
 # Package citations -------------------------------------------------------
 
@@ -112,7 +153,7 @@ map(.cran_packages, citation)
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021, 2022 Eugenio Parente
+# Copyright 2021, 2022, 2024 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

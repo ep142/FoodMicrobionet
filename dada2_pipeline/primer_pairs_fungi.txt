@@ -1,13 +1,18 @@
 Target_region	primer_f_name	primer_f_seq	primer_r_name	primer_r_seq	reference	notes
 ITS1	ITS1-F_KYO2	TAGAGGAAGTAAAAGTCGTAA	ITS2_KYO2	CTHGGTCATTTAGAGGAASTAA	"Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863"	
 ITS1	ITS1FI2	GAACCWGCGGARGGATCA	5.8S	CGCTGCGTTCTTCATCG		
-ITS1	BITS	CTACCTGCGGARGGATCA	B58S3	GAGATCCRTTGYTRAAAGTT	"Bokulich, N.A., Mills, D.A., 2013 Improved selection of internal transcribed spacer-specific primers enables quantitative, ultra-high throughput profiling of fungal communities. Appl Environ Microbiol 79:2519Ð26."	
+ITS1	BITS	ACCTGCGGARGGATCA	B58S3	GAGATCCRTTGYTRAAAGTT	"Bokulich, N.A., Mills, D.A., 2013 Improved selection of internal transcribed spacer-specific primers enables quantitative, ultra-high throughput profiling of fungal communities. Appl Environ Microbiol 79:2519Ð26."	
 ITS1	ITS1	TCCGTAGGTGAACCTGCGG	ITS4	TCCTCCGCTTATTGATATGC		
 ITS2	ITS3F	GCATCGATGAAGAACGCAGC	ITS4R	TCCTCCGCTTATTGATATGC	"White, T.J., Bruns, T.D., Lee, S.B., Taylor, J.W., 1990. Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315Ð322"	
 ITS2	ITS86F	GTGAATCATCGAATCTTTGAA	ITS4	TCCTCCGCTTATTGATATGC		
 ITS1 5.8S and ITS2	ITS1	TCCGTAGGTGAACCTGCGG	ITS4	TCCTCCGCTTATTGATATGC		
-ITS2	ITS3f	GCATCGATGAAGAACGCAGC	ITS4-KYO1	AHCGATGAAGAACRYAG	"Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863"	
+ITS2	ITS3f	GCATCGATGAAGAACGCAGC	ITS4-KYO1	TCCTCCGCTTWTTGWTWTGC	"Toju, H., Tanabe, A.S., Yamamoto, S., Sato, H., 2012. High-Coverage ITS Primers for the DNA-Based Identification of Ascomycetes and Basidiomycetes in Environmental Samples. PLoS ONE 7, e40863. https://doi.org/10.1371/journal.pone.0040863"	
 ITS1	ITS5F	GGAAGTAAAAGTCGTAACAAGG	ITS1R	GCTGCGTTCTTCATCGATGC		
 ITS1	ITS1F	TTGGTCATTTAGAGGAAGTAA	ITS2	GCTGCGTTCTTCATCGATGC	"White, T.J., Bruns, T.D., Lee, S.B., Taylor, J.W., 1990. Amplification and direct sequencing of fungal ribosomal RNA genes for phylogenetics. In: Innis MA,Gelfand DH, Sninsky JJ, White TJ, editors. PCR protocols: a guide to methodsand applications. United States: Academic Press. pp. 315Ð322; Motooka, D., Fujimoto, K., Tanaka, R., Yaguchi, T., Gotoh, K., Maeda, Y., Furuta, Y., Kurakawa, T., Goto, N., Yasunaga, T., Narazaki, M., Kumanogoh, A., Horii, T., Iida, T., Takeda, K., Nakamura, S., 2017. Fungal ITS1 Deep-Sequencing Strategies to Reconstruct the Composition of a 26-Species Community and Evaluation of the Gut Mycobiota of Healthy Japanese Individuals. Front. Microbiol. 8, 238. https://doi.org/10.3389/fmicb.2017.00238"	
 ITS1	ITS1Fv2	CTTGGTCATTTAGAGGAAGTAA	ITS1R	GCTGCGTTCTTCATCGATGC		
 ITS2	F2045	GCATCGATGAAGAACGCAGC	R2390	TCCTCCGCTTATTGATATGC		identical to ITS3f - ITS4
+ITS1	ITS5F	GGAAGTAAAAGTCGTAACAAGG	ITS2	GCTGCGTTCTTCATCGATGC		used by Novogene as ITS5-1737F - ITS2-2043R
+ITS1	18SF	GTAAAAGTCGTAACAAGGTTTC	5.8S1R	GTTCAAAGAYTCGATGATTCAC	"Findley et al., 2013"	
+ITS2	ITS3-KYO2	GATGAAGAACGYAGYRAA	ITS4	TCCTCCGCTTATTGATATGC		
+ITS2	ITS3tagmix	CTAGACTCGTCACCGATGAAGAACGCAG	ITS-4ngs	TTCCTSCGGCTTATTGATATGC		
+ITS2	ITS4F	GAACGCAGCRAAIIGYGA	ITS9R	TCCTCCGCTTATTGATATGC		
