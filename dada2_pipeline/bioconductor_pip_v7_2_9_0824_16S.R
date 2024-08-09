@@ -408,7 +408,10 @@ if(paired_end){
 
 if(play_audio) beep(sound = sound_n)
 if(keep_time) toc()
-
+# clean up
+rm(myFwsample)
+if(paired_end) rm(myRvsample)
+gc()
 
 #  check primers automatically --------------------------------------------
 

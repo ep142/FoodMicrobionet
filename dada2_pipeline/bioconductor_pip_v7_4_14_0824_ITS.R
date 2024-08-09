@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.13, 18/07/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.14, 5/8/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -363,6 +363,10 @@ if(paired_end){
 }
 
 if(play_audio) beep(sound = sound_n)
+
+rm(myFwsample)
+if (paired_end) rm(myRvsample)
+gc()
 if(keep_time) toc()
 
 #  check primers automatically --------------------------------------------
@@ -536,8 +540,6 @@ if(paired_end){
   qplotrev
 }
 
-rm(myFwsample)
-if (paired_end) rm(myRvsample)
 
 # HINT make a note here of what you have done for reproducibility reasons: 
 # primers have been removed
@@ -594,12 +596,15 @@ filter_and_trim_par <- as.data.frame(cbind(truncf, truncr, trim_left,
 
 # matchIDs = true if prefiltered in QIIME;
 if(use_cutadapt) {
-  tofiltFs <- cutFs
+  filt_sel <- which(basename(cutFs) %in% basename(fnFs))
+  tofiltFs <- cutFs[filt_sel]
 } else {
   tofiltFs <- fnFs
 }
 if(paired_end) {
-  if(use_cutadapt) {tofiltRs <- cutRs
+  if(use_cutadapt) {
+    filt_sel <- which(basename(cutRs) %in% basename(fnRs))
+    tofiltRs <- cutRs[filt_sel]
   } else {
     tofiltRs <- fnRs
   }

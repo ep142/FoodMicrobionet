@@ -144,7 +144,7 @@ rm(list = ls(pattern = "seqtab_f_"))
 
 # recheck length distribution and see if singletons are still there
 # look at the abundance distribution
-data.frame(nseqs = colSums(seqtab_f)) |>
+data.frame(nseqs = colSums(seqtab.nochim)) |>
   ggplot() +
   geom_histogram(mapping = aes(x= log10(nseqs))) +
   labs(
@@ -570,6 +570,7 @@ n_samples <- nrow(samples)
 instrument <- unique(samples$Instrument)[1]  # in some cases length >1
 seq_center <- unique(samples$Center_Name) 
 if(is_null(seq_center)) seq_center <- unique(samples$Center.Name)
+if(is_null(seq_center)) seq_center <- unique(samples$CenterName)
 # extract the average read length as an integer
 read_length <- round(mean(nchar(rownames(ttab)), na.rm = T)) 
 

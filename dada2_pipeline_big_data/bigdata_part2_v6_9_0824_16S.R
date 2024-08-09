@@ -2,22 +2,15 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v6_7_26_04_22
+# bigdata_part2_v6_9_0824
 ################################################################################
 
 # This script is designed to process large studies using the
 # DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html with options
 # for large studies https://benjjneb.github.io/dada2/bigdata.html
 
-# This version of the script (v6_7) includes options
-# for single end/paired end data sets obtained with Illumina or 454 or
-# Ion Torrent
-# and will perform steps up to teh creation of the sequence table
-# For each iteration of the script over the identifiers.txt table, created with
-# the getHeader script, a new sequence table is created and saved from the
-# corresponding group fo sequences. These are then assembled and processed
-# using the bigdata_part2 script which carries out further processing needed to ready 
-# the output for import into FoodMicrobionet
+# This version of the script (v6_9) combines sequence tables and performs 
+# taxonomic assignment and post processing, following part 1
 
 # to use this script follow the instructions in script bigdata_part1 and run  
 # getHeader and bigdata_part1 (as many times as there are groups in the identifier file)
@@ -28,7 +21,8 @@
 
 # load packages -----------------------------------------------------------
 
-.cran_packages <- c("tidyverse", "parallel", "gridExtra", "knitr", "stringr", "reshape2", "beepr")
+.cran_packages <- c("tidyverse", "parallel", "gridExtra", "knitr", "stringr", 
+                    "reshape2", "beepr", "tictoc", "logr")
 .bioc_packages <- c("BiocManager","dada2", "phyloseq", "BiocStyle", 
                     "DECIPHER", "phangorn")
 
@@ -49,16 +43,38 @@ if(any(!.inst)) {
 }
 # Load packages into session, and print package version
 sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
+
+sessionInfo()
+
+# other setup operations ------------------------------------------------
+
+opar <- par(no.readonly=TRUE) 
+par(ask=F) 
+# set.seed(1234) 
+# plays audio notifications if TRUE
+play_audio <- T
+sound_n = 6 # an integer from 1 to 11, sets the notification sound
+# keeps record of duration of important steps if TRUE
+keep_time <- T
+# verbose output: will print additional objects and messages if TRUE
+verbose_output <- T
+# do you want to use a log to store the options you used in processing?
+# the default is T with verbose_output <- T otherwise you have to set it
+# manually
+use_logr <- ifelse(verbose_output, T, F)
+# use_logr <-T use this line to change it manually
+
+if(play_audio) beep(sound = sound_n) # the notification you will hear
 # the following command detects the number of cores on UNIX/MacOS
+
 nc <- parallel::detectCores(logical = F) # to detect physical cores in MacOS
 set.seed(100)
 
-sessionInfo()
 
 # info for file saving
 
 # load data from previous session
-gen_data <- readRDS("gen_data.RDS")
+gen_data <- readRDS(file = "gen_data.RDS")
 
 Study <- gen_data$Study
 target <- gen_data$target
@@ -67,14 +83,19 @@ seq_accn <- Study
 DOI <- gen_data$DOI
 
 # information on the platform and arrangement
-
+data_type <- gen_data$data_type
 platform <- gen_data$platform 
 overlapping <- gen_data$overlapping
+target1 <- gen_data$target1
+target2 <- region
 paired_end <- gen_data$paired_end 
 primer_f <- gen_data$primer_f 
 primer_r <- gen_data$primer_r 
-target1 <- gen_data$target1
-target2 <- region
+FWD <- gen_data$primerf_seq
+REV <- gen_data$primerr_seq
+
+# information on merging
+merge_option <- gen_data$merge_option
 
 
 # merge multiple runs -----------------------------------------------------
@@ -115,7 +136,16 @@ save.image(file = str_c(Study,".Rdata"))
 rm(list = ls(pattern = "seqtab_f_"))
 
 # recheck length distribution and see if singletons are still there
-qplot(log10(colSums(seqtab.nochim)))
+# look at the abundance distribution
+data.frame(nseqs = colSums(seqtab.nochim)) |>
+  ggplot() +
+  geom_histogram(mapping = aes(x= log10(nseqs))) +
+  labs(
+    title = "sequence length distribution", 
+    x = "log10(seq_count)", 
+    y = "number of individual sequences"
+  )
+
 # which ASVs are singletons or doubletons?
 single_double <- which(colSums(seqtab.nochim)<=2)
 length(single_double)/ncol(seqtab.nochim)
@@ -381,6 +411,8 @@ save(taxtab, seqtab.nochim, track2, Study, target, region,
      seq_accn, DOI, primer_f, primer_r, target1, target2, taxtab2, 
      file = str_c(Study,"_small.Rdata"))
 
+
+
 # Build phylogenetic tree ---------------------------------------------
 
 # decipher can align only ~46k seqs
@@ -529,6 +561,7 @@ n_samples <- nrow(samples)
 instrument <- unique(samples$Instrument)[1]  # in some cases length >1
 seq_center <- unique(samples$Center_Name) 
 if(is_null(seq_center)) seq_center <- unique(samples$Center.Name)
+if(is_null(seq_center)) seq_center <- unique(samples$CenterName)
 # extract the average read length as an integer
 read_length <- round(mean(nchar(rownames(ttab)), na.rm = T)) 
 
@@ -554,7 +587,7 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c("Fermented meat batter", Sample_Name, sep =", "))
+  mutate(description = str_c(env_local_scale, env_medium, Library.Name, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
@@ -574,7 +607,7 @@ samples <- samples %>%
   select(label2, n_reads2, n_issues, description, target1, target2, 
          biosample = BioSample, SRA_Sample = BioSample, SRA_run = Run, 
          geo_loc_country = geo_loc_name_country, 
-         geo_loc_continent = geo_loc_name_country_continent, lat_lon = Lat_lon)
+         geo_loc_continent = geo_loc_name_country_continent, lat_lon)
 
 
 # save the sample information
@@ -748,11 +781,11 @@ map(c(.cran_packages, .bioc_packages), citation)
 
 # Most of the script is taken from https://benjjneb.github.io/dada2/tutorial.html
 # or https://benjjneb.github.io/dada2/bigdata.html
-# with some changes and adaptations
+# with changes and adaptations
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021, 2022 Eugenio Parente
+# Copyright 2021, 2022, 2024, Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 
