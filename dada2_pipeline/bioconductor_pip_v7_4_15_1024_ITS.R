@@ -1,4 +1,4 @@
-# DADA2/Bioconductor pipeline for ITS, modified, v7.4.14, 5/8/24
+# DADA2/Bioconductor pipeline for ITS, modified, v7.4.15, 4/10/24
 
 #  Description & instructions ---------------------------------------------
 
@@ -133,7 +133,9 @@ source(file.path("..","bioconductor_pip_ITS_functions.R"))
 data_type <- "sra" 
 # alternatives are "sra", for data downloaded from sra
 # "novogene_raw", for data obtained from novogene, with primer not removed
-# "novogene_clean", for data obtained from novogene, data with primer removed
+# "novogene_rawa", for data obtained from novogene, with primer  and adapter not removed
+# "novogene_clean", for data obtained from novogene, data with primer removed, 
+#  after merging and chimera removal
 
 # creating information for the study and sample data frames
 # when using data other than those downloaded from SRA replace
@@ -225,9 +227,11 @@ if(data_type == "sra"){
     if(str_detect(data_type, "clean")){
       file_index <- which(str_detect(file_list[[i]], "effective.fastq.gz"))
     } else {
-      # if you want the seqs without primer and adapter
-      # file_index <- which(!str_detect(file_list[[i]], "raw") & !str_detect(file_list[[i]], "Frags"))
-      file_index <- which(str_detect(file_list[[i]], "raw"))
+      if(str_detect(data_type, "rawa")){
+        file_index <- which(str_detect(file_list[[i]], "raw"))
+      } else {
+        file_index <- which(!str_detect(file_list[[i]], "raw") & !str_detect(file_list[[i]], "Frags"))
+      }
     }
     file_list[[i]]<-file.path(
       fastq_dirs[i],
@@ -259,10 +263,9 @@ sample.names <- dplyr::case_when(
   all(str_detect(basename(fnFs),".")) ~ sapply(strsplit(basename(fnFs), ".", fixed = T), `[`, 1),
 )
 # ad hoc
-if(data_type == "novogene_raw"){
+if(data_type == "novogene_rawa"){
   sample.names <- str_remove(sample.names, "\\.raw")
 }
-
 
 # early check for sequences and metadata --------------------------------
 
@@ -1178,6 +1181,12 @@ if(data_type == "sra"){
 } else {
   rownames(samdf) <- samdf$Library_Name
   }
+# need ad hoc fix
+samdf_copy <- samdf |>
+  select(-description...23)
+colnames(samdf_copy)[22]<-"description"
+samdf_old <- samdf
+samdf<-samdf_copy
 
 # a transposed sequence table
 seqtab_t = t(seqtab.nochim)
@@ -1250,12 +1259,6 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # this needs to be adapted for each study
 # check naming of the geoloc info
 
-samples <- samples %>%
-  mutate(description = str_c(SampleName, sep =", "))
-if(data_type == "sra"){
-  samples <- samples %>%
-    mutate(Sample_Name = Run) }
-
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
 # use these if part or all of the geolocation information is missing
@@ -1267,6 +1270,7 @@ if(data_type == "sra"){
 # tidyr::separate)
 
 # need to be adjusted ad hoc
+samples_copy <- samples
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(label2 = str_c("s.",Sample_Name), target1 = target1, 
@@ -1275,14 +1279,14 @@ if(data_type == "sra"){
            biosample = BioSample, SRA_Sample = BioSample, SRA_run = Run, 
            geo_loc_country = geo_loc_name_country, 
            geo_loc_continent = geo_loc_name_country_continent, lat_lon)
-  } else {
+} else {
   samples <- samples %>%
     mutate(label2 = str_c("s.",Sample_Name), target1 = target1, 
            target2 = target2, SRA_Sample = NA_character_, 
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
-           biosample = Sample_code, geo_loc_country = geo_loc_name_country, 
-           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon, Sample_Name)
+           geo_loc_country = geo_loc_name_country, 
+           geo_loc_continent = geo_loc_name_country_continent, lat_lon, Sample_Name)
 }
 
 

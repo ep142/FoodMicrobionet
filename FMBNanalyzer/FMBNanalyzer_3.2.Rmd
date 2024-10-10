@@ -1,5 +1,5 @@
 ---
-title: "FMBNanalyzer.Rmd, v 2.3.1"
+title: "FMBNanalyzer.Rmd, v 3.2"
 subtitle: "A .rmd document for generating reports using data extracted from FMBN"
 author: "E. Parente, Scuola SAFE, Università degli Studi della Basilicata"
 date: "`r format(Sys.time(), '%d %B %Y')`"
@@ -9,6 +9,18 @@ output:
     toc_float: yes
     df_print: paged
 ---
+
+
+Thing I want to do / consider
+
+1. add PERFect as a filter, using the filter my taxa function (need to build a phyloseq first)
+
+2. consider using phyloseq objects as a base for all activities or, as an alternative, produce phyloseq objects when filtering; pro, better wrappers, the objects can be used in other packages; con, the present version does not need phyloseq to operate
+
+3. use %chin% from data.table for filtering  
+
+4. use crayon for warnings 
+
 
 ```{r setup, include=FALSE}
 
@@ -22,6 +34,23 @@ knitr::opts_chunk$set(echo = TRUE)
 .cran_packages <- c("plyr", "reshape2", "gplots", "tidyverse", "knitr",
                     "randomcoloR", "bipartite", "RColorBrewer",
                     "ggrepel", "vegan")
+.bioc_packages <- c("BiocManager", "phyloseq", "PERFect")
+
+# if installation of PERFect fails try:
+# library(devtools)
+# install_github("cxquy91/PERFect")
+
+.inst <- .bioc_packages %in% installed.packages()
+if(any(!.inst)) {
+  if(!.inst[1]) {
+    install.packages("BiocManager")
+    .inst <- .bioc_packages %in% installed.packages()
+  }
+  if(any(!.inst[2:length(.inst)])) {
+    BiocManager::install(.bioc_packages[!.inst], ask = F)
+  }
+}
+
 .inst <- .cran_packages %in% installed.packages()
 if(any(!.inst)) {
   install.packages(.cran_packages[!.inst])
@@ -31,16 +60,16 @@ sapply(.cran_packages, require,
 
 opar <- par(no.readonly = T)
 set.seed(1234)
-#########1#########2#########3#########4#########5#########6#########7#########8
 
 
 ```
 
-v2.3.1 10/2/2022
+
+v 3_2 October 2024
 
 # How do I use this document?
 
-The purpose of this .Rmd document is to provide a template for a report with a number of descriptive graphs and tables (and save them, as applicable) using data extracted from ShinyFMBN (find more on [GitHub](https://github.com/ep142/FoodMicrobionet) or on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4)) an app to explore the [FoodMicrobionet database](http://www.foodmicrobionet.org) of metataxonomic data on the composition of bacterial communities in foods.
+The purpose of this .Rmd document is to provide a template for a report with a number of descriptive graphs and tables (and save them, as applicable) using data extracted from ShinyFMBN (find more on [GitHub](https://github.com/ep142/FoodMicrobionet) or on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4)) an app to explore the [FoodMicrobionet database](http://web.unibas.it/parente/?page_id=761) of metataxonomic data on the composition of bacterial communities in foods.
 
 To use this document you need to:
 
@@ -48,11 +77,11 @@ To use this document you need to:
 
 -   perform a search in ShinyFMBN and export the **agg** file: see the manual for ShinyFMBN on [Mendeley Data](https://data.mendeley.com/datasets/8fwwjpm79y/4) for further details
 
--   put the file (you will find it in the output -> aggdata folder, located in the app folder) in a new folder containing this template
+-   put the file (you can either use the aggdata file, which you will find in the `output -> aggdata folder`, located in the app folder, or the phyloseq file which you will find in the `output -> phyloseq folder`; the latter does not include study metadata) in a new folder containing this template
 
 -   [create a RStudio project](https://support.rstudio.com/hc/en-us/articles/200526207-Using-RStudio-Projects) for that folder. 
 
--   set the options for filtering, saving etc. in the chunk below (lines 87-214)
+-   set the options for filtering, saving etc. in the chunk `loaddata_setoptions`
 
 -   knit the document (the default is to .html, but you can change the YAML header (or choose the appropriate option in the Knit menu) to obtain .pdf (need LaTex) or MS Word documents  
 
@@ -64,13 +93,13 @@ Knowledge of [Rmarkdown](https://rmarkdown.rstudio.com/docs/articles/rmarkdown.h
 
 ## Known issues.
 
-The document should knit without problems if you hit the Knit icon in RStudio. You may see some warnings (some are more frequent if your projects are on a remote drive in MacOS, i.e. Google drive):
+The document should knit without problems if you hit the `Knit` icon in RStudio. You may see some warnings (some are more frequent if your projects are on a remote drive in MacOS, i.e. Google drive):
 
 -   cleaning the working environment or restarting R before running this script may prevent some problems.
 
 -   if you see a warning that .png graphs cannot be saved this might be due to the fact that you have the file in a folder syncing with Google Drive. The issue disappears when you move everything to your local drive or use Dropbox
 
--   some graphs are generated using random palettes rather than brewer's palettes (which are nicer). If you don't like the colors try starting a new RStudio session and knitting again (or using a lower number of samples/sample groups or selecting more stringent parameters for the selection of taxa, which is also wiser.)
+-   some graphs are generated using random palettes rather than Rcolorbrewer's palettes (which are nicer). If you don't like the colors try starting a new RStudio session and knitting again (or using a lower number of samples/sample groups or selecting more stringent parameters for the selection of taxa, which is also wiser.)
 
 -   some calculations are slow and memory + CPU intensive: this is especially true for rarefaction analysis, calculation of networks stats and module inference. Please be patient (or select a more manageable number of sample/sample groups and taxa); in fact, it might be difficult to run the whole analysis with 8 Gb RAM. In addition, if you choose .tiff as a graph output format and select a high value for graph resolution, the graphic output can be pretty large in terms of disk space (and further slow the execution).
 
@@ -78,7 +107,7 @@ The document should knit without problems if you hit the Knit icon in RStudio. Y
 
 There are two other options you can consider as an alternative to saving \_aggdata in the Shiny app and using this document to generate a report:
 
--   save a [phyloseq](https://joey711.github.io/phyloseq/) file and use it in your own script: this is usually more flexible, because phyloseq functions are much more powerful than those used here (although this script will usually handle legends in a more sensible way). If you are not familiar with the phyloseq package you can try the phyloseq file with [Shiny Phyloseq](https://joey711.github.io/shiny-phyloseq/), a Shiny app which provides an interactive interface. In addition phyloseq objects are used as an input by many other R packages on microbiome analysis.
+-   save a [phyloseq](https://joey711.github.io/phyloseq/) file and use it in your own script: this is usually more flexible, because `phyloseq` functions are much more powerful than those used here (although this script will usually handle legends in a more sensible way). If you are not familiar with the phyloseq package you can try the phyloseq file with [Shiny Phyloseq](https://joey711.github.io/shiny-phyloseq/), a Shiny app which provides an interactive interface. In addition phyloseq objects are used as an input by many other R packages on microbiome analysis.
 
 
 **Please remember**: in FoodMicrobionet during analysis of raw sequences ASVs are aggregated in taxa which share the same annotation; further aggregation may then be performed during extraction of data with the ShinyFMBN app. In the code below I am using the term OTUs rather loosely.
@@ -142,9 +171,9 @@ overrideOTU <- F # set to T if you want more than 15 categories in OTU palettes
 # Eukaryota can also be removed
 removeOther <- T
 removeKonly <- T # removes the taxa which have been identified only at the level of Kingdom
-removeChloroplast <- T
-removeMitochondria <- T
-removeEukaryota <- T
+removeChloroplast <- T # only needed if you work on 16S as a target
+removeMitochondria <- T # only needed if you work on 16S as a target
+removeFungi <- T # F if you are working on fungi, T if you are working on bacteria
 
 # options for filtering samples and OTUs
 # if filtersamples == T the sample filter will be applied (overridden if sample_agg == "exp. code")
@@ -176,7 +205,7 @@ minsampleab <- 1000
 # The default is F, although rarefaction will be performed for bipartite
 # analysis 
 
-rareoption <- F
+rareoption <- T
 raremin <- T
 raren <- 10000
 rarefy_flag <- F # will be set to T if rarefaction is performed
@@ -207,17 +236,17 @@ loghmscale <- T
 # option for performing rarefaction analysis on the unfiltered matrix
 dorareanalysis <- F
 
-#########1#########2#########3#########4#########5#########6#########7#########8
 # make a qualitative color palette
 n <- maxOTUcats
 rpalette <- distinctColorPalette(n)
 names(rpalette) <- NULL
-#########1#########2#########3#########4#########5#########6#########7#########8
+
+
 # functions for repetitive tasks
-#########1#########2#########3#########4#########5#########6#########7#########8
+
 # a function for filtering (will be used several times)
 filter_taxa_1 <- function(OTUmatrix){
-  # optionally remove "Other", "Chloroplast", "Mitochondria" and "Eukaryota"
+  # optionally remove "Other", "Chloroplast", "Mitochondria" and "Fungi"
   # and taxa with identification only at the level of Kingdom
   if (removeOther) {
     OTUmatrix <- OTUmatrix[, colnames(OTUmatrix)!= "Other"]
@@ -234,9 +263,9 @@ filter_taxa_1 <- function(OTUmatrix){
       pull(label)
     OTUmatrix <- OTUmatrix[, -which(colnames(OTUmatrix) %in% mit_labels)]
   }
-  if (removeEukaryota){
+  if (removeFungi){
     euk_labels <- input_data$taxa_metadata %>%
-      dplyr::filter(domain == "Eukaryota") %>%
+      dplyr::filter(domain == "Eukaryota" | domain == "Fungi") %>%
       pull(label)
     if (length(euk_labels > 0)){
       OTUmatrix <- OTUmatrix[, -which(colnames(OTUmatrix) %in% euk_labels)]
@@ -305,6 +334,7 @@ make_OTU_palettes <- function(OTUmatrix,
     }
   if (catOTUs == "class") {
     myOTUpalette <- as.character(OTUcolors$ccolor)
+    names(myOTUpalette)<-OTUcolors$label
     myOTUtext <- as.character(ccolors$class)
     myOTUcolors <- as.character(ccolors$ccolor)
   } else {
@@ -345,8 +375,8 @@ kable(distinct(
   select(input_data$sample_metadata, llabel, foodId, L4, L6, nature, process, spoilage)
          ))
 ```
-
 The aggregation level for taxa is `r input_data$tax_agg`. There are `r nrow(input_data$taxa_metadata)` identified at `r input_data$tax_agg` level or above, before filtering.  
+
 Rarefaction, sample filtering and taxonomic and abundance/prevalence filtering are (optionally) performed as described in the following section.  
 Rarefaction curves are and diversity indices (number of observed "species", Chao1, ACE) calculated using functions of the [vegan package](https://cran.r-project.org/web/packages/vegan/index.html).  
 Bar and box plots for relative taxa abundance, configurations for sample/sample groups and taxa are produced using functions of package [ggplot2](https://ggplot2.tidyverse.org).  
@@ -369,7 +399,7 @@ Your options for filtering are:
 
 -   removeMitochondria `r removeMitochondria`
 
--   removeEukaryota `r removeEukaryota`
+-   removeFungi `r removeFungi`
 
 -   filtersamples `r filtersamples` (if T samples with \<`minsampleab` sequences will be filtered)
 
@@ -588,10 +618,12 @@ groupcolors <- groupcolors %>% dplyr::arrange(label)
 # Set the palette and colors and text for legends
 if (catsamples  == "L1") {
   myspalette <- as.character(groupcolors$fgcolor)
+  names(myspalette) <- groupcolors$label
   mystext <- as.character(foodgpalette$L1)
   myscolors <- as.character(foodgpalette$fgcolor)
 } else {
   myspalette <- as.character(groupcolors$fsgcolor)
+  names(myspalette) <- groupcolors$label
   mystext <- as.character(foodsgpalette$L4)
   myscolors <- as.character(foodsgpalette$fsgcolor) 
 }
@@ -1102,6 +1134,7 @@ myOTUcolors <- OTU_palette_data$colors
 catOTUs <- OTU_palette_data$cat_OTU_flag
 myOTUtext <- OTU_palette_data$text
 myOTUpalette <- OTU_palette_data$palette
+names(myOTUpalette) <- OTUcolors$label
 
 cat("The aggregation level for OTUs is ", input_data$tax_agg, "\n", 
     "There are ", ncol(OTUmatrixf_relab_hm), " OTU in this set.", "\n",
@@ -1148,7 +1181,7 @@ keyscale <- "rel. abundance"
 if (loghmscale) {
   # lbound gives a default to 0 abundances using max number of seqs per sample
   lbound <- 10^(-ceiling(log10(max(rowSums(tOTUm)))))
-  hm <- aaply(hm, c(1,2), 
+  hm <- plyr::aaply(hm, c(1,2), 
               function(x,minprop) log10(x+minprop),minprop=lbound)
   keyscale <- "log10(rel.abundance)"
 }
@@ -1156,6 +1189,9 @@ if (loghmscale) {
 # heat map with legend for abundance levels, margins, lhei, lwid, srtCol, 
 # offsetRow and offsetCol may require tinkering.
 # Size temporarily reset for saving
+# reorder palettes
+myOTUpalette <- myOTUpalette[colnames(OTUmatrixf_relab_hm)]
+myspalette <- myspalette[rownames(OTUmatrixf_relab_hm)]
 heatmap.2(hm, 
           Rowv = as.dendrogram(sample.clus), 
           Colv = as.dendrogram(OTU.clus),
@@ -1687,7 +1723,7 @@ The data used in this report were extracted from FoodMicrobionet using the Shiny
 all_packages <- c("base", .cran_packages)
 map(all_packages, citation)
 
-# for reproducibility reasons you should also run the following command
+# for reproducibility reasins you should also run the following command
 # sessionInfo()
 
 ```
@@ -1698,6 +1734,7 @@ v2.3 9/2/2022 This .Rmd file was created by Eugenio Parente, Università degli S
 The checkpackages function is derived from [this post](http://tinyurl.com/jjwyzph).  
 The code for making qualitative palette is derived from [this article](http://tinyurl.com/hawqufy).  
 The code for heat maps is modified from an article on the [Molecular ecologist blog](http://tinyurl.com/hxxbmvz).  
+The code for the creation of the prevalence and abundance data frame is taken from here: https://bioconductor.org/help/course-materials/2017/BioC2017/Day1/Workshops/Microbiome/MicrobiomeWorkflowII.html  
 **The code is under [MIT](https://opensource.org/licenses/MIT) license** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:  
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  
 

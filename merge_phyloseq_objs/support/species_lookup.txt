@@ -23,6 +23,8 @@ Clostridium sensu stricto 1 isatidis	Clostridium isatidis	Clostridium isatidis	C
 Clostridium_sensu_stricto_1 isatidis	Clostridium isatidis	Clostridium isatidis	Clostridium	Clostridiaceae
 Clostridium sensu stricto 1 longisporum	Clostridium longisporum	Clostridium longisporum	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_1 longisporum	Clostridium longisporum	Clostridium longisporum	Clostridium	Clostridiaceae
+Clostridium sensu stricto 1 moniliforme	Clostridium moniliforme	Clostridium moniliforme	Clostridium	Clostridiaceae
+Clostridium_sensu_stricto_1 moniliforme	Clostridium moniliforme	Clostridium moniliforme	Clostridium	Clostridiaceae
 Clostridium sensu stricto 1 neonatale	Clostridium neonatale	Clostridium neonatale	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_1 neonatale	Clostridium neonatale	Clostridium neonatale	Clostridium	Clostridiaceae
 Clostridium sensu stricto 1 nigeriense	Clostridium nigeriense	Clostridium nigeriense	Clostridium	Clostridiaceae
@@ -51,6 +53,8 @@ Clostridium sensu stricto 12 magnum	Clostridium magnum	Clostridium magnum	Clostr
 Clostridium_sensu_stricto_12 magnum	Clostridium magnum	Clostridium magnum	Clostridium	Clostridiaceae
 Clostridium sensu stricto 12 tyrobutyricum	Clostridium tyrobutyricum	Clostridium tyrobutyricum	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_12 tyrobutyricum	Clostridium tyrobutyricum	Clostridium tyrobutyricum	Clostridium	Clostridiaceae
+Clostridium sensu stricto 13 estertheticum	Clostridium estertheticum	Clostridium tyrobutyricum	Clostridium	Clostridiaceae
+Clostridium_sensustricto_13_estertheticum	Clostridium estertheticum	Clostridium tyrobutyricum	Clostridium	Clostridiaceae
 Clostridium sensu stricto 13 punense	Clostridium punense	Clostridium punense	Clostridium	Clostridiaceae
 Clostridium_sensu_stricto_13 punense	Clostridium punense	Clostridium punense	Clostridium	Clostridiaceae
 Clostridium sensu stricto 13 subterminale	Clostridium subterminale	Clostridium subterminale	Clostridium	Clostridiaceae

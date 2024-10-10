@@ -2,22 +2,15 @@
 # DADA2/Bioconductor pipeline for big data, modified
 # part 3, remove chimera, assign taxonomy, save a phyloseq object, prepare files for FMBN
 #
-# bigdata_part2_v7_0724_ITS
+# bigdata_part2_v6_9_0824
 ################################################################################
 
 # This script is designed to process large studies using the
 # DADA2 pipeline https://benjjneb.github.io/dada2/tutorial.html with options
 # for large studies https://benjjneb.github.io/dada2/bigdata.html
 
-# This version of the script (v7) includes options
-# for single end/paired end data sets obtained with Illumina or 454 or
-# Ion Torrent, is adapted for taxonomy assignment with UNITE,
-# and will perform steps up to the creation of the sequence table
-# For each iteration of the script over the identifiers.txt table, created with
-# the getHeader script, a new sequence table is created and saved from the
-# corresponding group fo sequences. These are then assembled and processed
-# using the bigdata_part2 script which carries out further processing needed to ready 
-# the output for import into FoodMicrobionet
+# This version of the script (v6_9) combines sequence tables and performs 
+# taxonomic assignment and post processing, following part 1
 
 # to use this script follow the instructions in script bigdata_part1 and run  
 # getHeader and bigdata_part1 (as many times as there are groups in the identifier file)
@@ -51,6 +44,8 @@ if(any(!.inst)) {
 # Load packages into session, and print package version
 sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
 
+sessionInfo()
+
 # other setup operations ------------------------------------------------
 
 opar <- par(no.readonly=TRUE) 
@@ -75,11 +70,10 @@ if(play_audio) beep(sound = sound_n) # the notification you will hear
 nc <- parallel::detectCores(logical = F) # to detect physical cores in MacOS
 set.seed(100)
 
-sessionInfo()
 
+# info for file saving
 
-# load data from previous session -----------------------------------------
-
+# load data from previous session
 gen_data <- readRDS(file = "gen_data.RDS")
 
 Study <- gen_data$Study
@@ -105,7 +99,6 @@ merge_option <- gen_data$merge_option
 
 
 # merge multiple runs -----------------------------------------------------
-
 # note for self: maybe use a functional instead
 # get the sequence files
 seq_files <- list.files()[grepl("seqtab_f_", list.files())]
@@ -118,6 +111,7 @@ for(i in seq_along(seq_files)) {
 # pass the names to the mergeSequenceTables function
 
 st.all <- mergeSequenceTables(tables = lapply(seq_tables, get))
+
 
 # get track files
 track_files <- list.files()[grepl("track_", list.files())]
@@ -135,8 +129,7 @@ write_tsv(as.data.frame(track), str_c("track_all_",Study,".txt"))
 dim(st.all)
 seqtab.nochim <- removeBimeraDenovo(st.all, method="consensus", 
                                     multithread=TRUE, verbose=TRUE)
-if(play_audio) beep(sound=sound_n)
-
+beep(sound=6)
 # better save workspace here (and then remove large objects to recover memory)
 
 save.image(file = str_c(Study,".Rdata"))
@@ -208,37 +201,38 @@ write_tsv(as.data.frame(track2), str_c("track_all_",Study,".txt"))
 
 # assign taxonomy ---------------------------------------------------------
 
-if(keep_time) tic("\nassign taxonomy")
 # set the directory for taxonomy databases
-
-RC <-F # try reverse complement of asignTaxonomy(), will be changed if needed
-
-# UNITE
 taxdb_dir <- file.path("..","tax_db") # change this if the tax databases are elsewhere
-ref_fasta <- file.path(taxdb_dir, "sh_general_release_dynamic_s_04.04.2024.fasta")
+list.files(taxdb_dir)
+
+# assignment with SILVA
+RC <- F # option for trying reverse complement, false by default
+
+# Loading files needed to manage taxonomy, note locations
+ref_fasta <- file.path(taxdb_dir, "silva_nr99_v138_1_train_set.fa")
+sp_ass_SILVA <- file.path(taxdb_dir, "silva_species_assignment_v138_1.fa")
+
 
 # defining the function for assigning taxonomy ----------------------------
 
 # function for assigning taxonomy and returning a list of objects
 # needed to avoid copy and paste in the loop
 
-Assign_taxonomy_ITS <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
-  cat("Assigning taxonomy with UNITE...", "\n")
+Assign_taxonomy <- function(seqtab, paired_end = T, overlapping = T, rc = RC){
+  cat("Assigning taxonomy at the genus level with SILVA v138...", "\n")
   taxtab <- assignTaxonomy(seqtab, refFasta = ref_fasta, multithread = TRUE, tryRC = rc)
   cat("done...", "\n")
+  # do species assignment (only if overlapping or not paired end)
+  if(!paired_end | overlapping){
+    cat("Assigning taxonomy at the species level with SILVA v138...", "\n")
+    taxtab <- addSpecies(taxtab, sp_ass_SILVA, tryRC = rc)
+    cat("done...", "\n")
+  }
   taxtab2 <- as_tibble(rownames_to_column(as.data.frame(taxtab, 
                                                         stringsAsFactors = F), "ASV"))
   if(!"Species" %in% colnames(taxtab)) taxtab2$Species <- NA_character_
   
-  # clean taxa
-  taxtab2 <- taxtab2 %>%
-    mutate(Kingdom = str_remove(Kingdom, "k__"),
-           Phylum = str_remove(Phylum, "p__"),
-           Class = str_remove(Class, "c__"),
-           Order = str_remove(Order, "o__"),
-           Family = str_remove(Family, "f__"),
-           Genus = str_remove(Genus, "g__"),
-           Species = str_remove(Species, "s__"))
+  # maybe in the future add a variable with the Study, just to merge the database of ASVs
   
   taxtab2[is.na(taxtab2)] <- ""
   taxtab2 <- taxtab2 %>%
@@ -249,10 +243,7 @@ Assign_taxonomy_ITS <- function(seqtab, paired_end = T, overlapping = T, rc = RC
                            ifelse(Order == "", Class, 
                                   ifelse(Family == "", Order, 
                                          ifelse(Genus == "", Family, 
-                                                ifelse(Species == "", 
-                                                       Genus, paste(Genus, 
-                                                                    Species, sep =" ")
-                                                       )))))))
+                                                ifelse(Species == "", Genus, paste(Genus, Species, sep =" "))))))))
     })
   
   # build the list to return
@@ -265,10 +256,11 @@ Assign_taxonomy_ITS <- function(seqtab, paired_end = T, overlapping = T, rc = RC
   return(tax_tab_list)
 }
 
-split_point <- 5000
+split_point <- 2500
 # if <2500 ASVs, run in one set, else split and use a loop
 # else run only once
-# 2500 is safer with 8 Gb RAM but otherwise you can set this to 5000
+# roughly for short sequences, like V4 you can set to 5000, while for V1-V3 
+# and V3-V4 2500 is safer with 8 Gb RAM
 
 split <- F
 if(dim(seqtab.nochim)[2]>=split_point) split <-T
@@ -283,11 +275,11 @@ ovlp <- overlapping
 if(!split){
   cat("assigning taxonomy...", "\n")
   
-  taxtab_list <- Assign_taxonomy_ITS(seqtab = seqtab.nochim, 
+  taxtab_list <- Assign_taxonomy(seqtab = seqtab.nochim, 
                                  paired_end = pend, overlapping = ovlp)
   if(mean(is.na(taxtab_list$taxtab_slot[,2]))>0.2){
     RC<<-T
-    taxtab_list <- Assign_taxonomy_ITS(seqtab = seqtab_nochim, 
+    taxtab_list <- Assign_taxonomy(seqtab = seqtab_nochim, 
                                    paired_end = pend, overlapping = ovlp, rc = RC)
   }
   cat("done...","\n")
@@ -306,11 +298,11 @@ if(!split){
     cat(str_c("ASV", from_c, "to", to_c, sep = " "),"\n")
     seqtab_nochim_temp <- seqtab.nochim[,from_c:to_c]
     cat("Assigning taxonomy...","\n")
-    taxtab_list_temp <- Assign_taxonomy_ITS(seqtab = seqtab_nochim_temp, 
+    taxtab_list_temp <- Assign_taxonomy(seqtab = seqtab_nochim_temp, 
                                         paired_end = pend, overlapping = ovlp, rc = RC)
     if(i == 1 && mean(is.na(taxtab_list_temp$taxtab_slot[,2]))>0.2){
         RC<<-T
-        taxtab_list_temp <- Assign_taxonomy_ITS(seqtab = seqtab_nochim_temp, 
+        taxtab_list_temp <- Assign_taxonomy(seqtab = seqtab_nochim_temp, 
                                             paired_end = pend, overlapping = ovlp, rc = RC)
     }
     
@@ -336,12 +328,8 @@ gc() # do garbage collection
 # better save here
 
 save.image(file = str_c(Study,".Rdata"))
-beep(sound=sound_n)  
+beep(sound=6)  
 }
-
-if(keep_time) toc()
-
-if(play_audio) beep(sound=sound_n)
 
 # fixing the output
 
@@ -349,37 +337,81 @@ taxtab <- taxtab_list$taxtab_slot
 taxtab2 <- taxtab_list$taxtab2_slot
 
 if(!split) {
-  rm(taxtab_list, Assign_taxonomy_ITS)
+  rm(taxtab_list, taxtab_list_temp, Assign_taxonomy)
 } else {
-  rm(taxtab_list, taxtab_list_temp, Assign_taxonomy_ITS) 
+  rm(taxtab_list, Assign_taxonomy) 
 }
 gc()
 
 # fixing bad taxa ---------------------------------------------------------
 
+# first fix taxa with ambiguous labels or potential duplicate labels
 
-# remove bad ides  ----------------------------------------
+# fix Incertae sedis (for Ruminococcaceae and Lachnospiraceae)
 
-# which is the proportion of sequences with Kingdom only?
-nASVs <- nrow(taxtab2)
-nkingdom <- taxtab2 %>% dplyr::filter(Phylum == "") %>% nrow()
-(f_nkingdom <-  nkingdom/nASVs)
-
-# change as appropriate
-filter_ASVs <- F
-if(filter_ASVs){
-  taxtab2_old <- taxtab2
-  seqtab.nochim_old <- seqtab.nochim
-  taxtab2 <- taxtab2 %>%
-    dplyr::filter(Phylum != "")
-  seqtab.nochim <- seqtab.nochim[,(colnames(seqtab.nochim) %in% taxtab2$ASV)]
+pos_to_change <- which(taxtab2$Genus == "Incertae Sedis")
+if(length(pos_to_change)>0){
+  cat("\nfixing Incertae Sedis in genera")
+  taxtab2$Genus[pos_to_change] <- paste(taxtab2$Family[pos_to_change], taxtab2$Genus[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] }
+# fix "Unknown Family"
+pos_to_change <- which((taxtab2$Family == "Unknown Family") & (taxtab2$Genus == ""))
+if(length(pos_to_change)>0){
+  cat("\nfixing Unknown family")
+  taxtab2$Family[pos_to_change] <- paste(taxtab2$Order[pos_to_change], taxtab2$Family[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
 }
+# fix s_label == uncultured
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Class == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Class")
+  taxtab2$Class[pos_to_change] <- paste("uncultured", taxtab2$Phylum[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Class[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Order == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Order")
+  taxtab2$Order[pos_to_change] <- paste("uncultured", taxtab2$Class[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Order[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Family == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Family")
+  taxtab2$Family[pos_to_change] <- paste("uncultured", taxtab2$Order[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Family[pos_to_change] 
+}
+pos_to_change <- which(taxtab2$s_label == "uncultured" & taxtab2$Genus == "uncultured")
+if(length(pos_to_change)>0){
+  cat("\nfixing uncultured in Genus")
+  taxtab2$Genus[pos_to_change] <- paste("uncultured", taxtab2$Family[pos_to_change], sep = " ")
+  taxtab2$s_label[pos_to_change] <- taxtab2$Genus[pos_to_change] 
+}
+
+# do further fixes using a lookup table
+bad_taxa <- read_tsv(file.path(taxdb_dir,"SILVA_bad-taxa.txt"))
+
+if(any(pull(taxtab2, s_label) %in% pull(bad_taxa, s_label))){
+  cat("\nfixing bad taxa using lookup table\n")
+  colnames(bad_taxa) <- c("s_label", "new_kingdom", "new_phylum", "new_class", 
+                          "new_order", "new_family", "new_genus", "new_species")
+  taxtab2 <- left_join(taxtab2, bad_taxa)
+  taxtab2 <- taxtab2 %>%
+    mutate(Genus = ifelse(is.na(new_genus), Genus, new_genus),
+           Family = ifelse(is.na(new_family), Family, new_family),
+           Order = ifelse(is.na(new_order), Order, new_order),
+           Class = ifelse(is.na(new_class), Class, new_class),
+    ) %>%
+    select(-(new_kingdom:new_species))
+}
+
 
 
 # save a smaller version of workspace which will be needed later
 save(taxtab, seqtab.nochim, track2, Study, target, region, 
      seq_accn, DOI, primer_f, primer_r, target1, target2, taxtab2, 
      file = str_c(Study,"_small.Rdata"))
+
+
 
 # Build phylogenetic tree ---------------------------------------------
 
@@ -389,13 +421,9 @@ dim(seqtab.nochim)[2]
 # if this is >46k will crash
 # but it is already prohibitive with 20k and usually not worth the effort
 
-dotree <- F # avoid if overlapping == F or if you have used the mixed option for merging
-if(dim(seqtab.nochim)[2]>10000 | overlapping == F | merge_option == "mixed") {
-  dotree <- F
-}
+dotree <- F # avoid if overlapping == F
 
 if (dotree) {
-  if(keep_time) tic("\nbuilding the phylogenetic tree")
   seqs <-
     dada2::getSequences(seqtab.nochim) # the collapse option is very interesting
   names(seqs) <- seqs # This propagates to the tip labels of the tree
@@ -434,58 +462,21 @@ if (dotree) {
     control = pml.control(trace = 0)
   )
   detach("package:phangorn", unload = TRUE)
-  if(keep_time) toc()
 }
-if(play_audio) beep(sound = sound_n)
+beep(sound = 6)
 
 save.image(file = str_c(Study,"_small.Rdata"))
 
 # Combine data into a phyloseq object ------------------------------------- 
 
-metadata_path <- file.path("data", "metadata", "SraRunTable.txt") 
-# alternatives when using data downloades from NCBI SRA are:
+# path to the metadata file (needs to be adapted)
+metadata_path <- file.path("data", "metadata", "SraRunTable.txt") # "data/metadata/SraRunInfo.txt"
+# alternatives are:
 # "data/metadata/SraRunInfo.txt" 
 # "data/metadata/SraRunTable.txt.csv"
 # "data/metadata/SraRunTable.txt"
 samdf <- read_tsv(metadata_path) 
 if(ncol(samdf)==1) samdf <- read_csv(metadata_path)
-# have a look at the sample data:
-# if both bacteria and yeasts are detected, you should generate an accession list for filtering
-# the following is an example of code for creating accession lists
-
-run_acc_list_code <- F
-if(run_acc_list_code){
-  acc_list_bacteria <- samdf |>
-    arrange(Run) |>
-    dplyr::slice(1:18) |>
-    dplyr::select(Run)
-  write_tsv(acc_list_bacteria, file = "acc_list_bacteria.txt")
-  acc_list_fungi <- samdf |>
-    arrange(Run) |>
-    dplyr::slice(19:35) |>
-    dplyr::select(Run)
-  write_tsv(acc_list_fungi, file = "acc_list_fungi.txt")
-}
-
-# use accession list to control which sequences will be processed
-# only sequences in the accn_list file will be processed
-use_accn_list <- F
-accn_list_name <- "acc_list_fungi.txt" # need to adapt this to your own file
-if(use_accn_list) {
-  accn_list <- pull(read_tsv(accn_list_name, col_names = F),1)
-  seq_to_process <- sample.names %in% accn_list
-  fnFs <- fnFs[seq_to_process]
-  if(paired_end) fnRs <- fnRs[seq_to_process]
-  sample.names <- sample.names[seq_to_process]
-}
-
-if(use_accn_list) samdf <- dplyr::filter(samdf, Run %in% sample.names)
-
-if(all(rownames(seqtab.nochim) %in% samdf$Run)){
-  cat("\nsamples in fastq files match samples in metadata\n")
-} else {
-  cat("\nWARNING samples in fastq files DO NOT match samples in metadata\n")
-}
 
 # check if any cols in seqtab have 0 sums
 seq_sums <- rowSums(seqtab.nochim)
@@ -582,9 +573,10 @@ loc_list <- ifelse("geo_loc_name_country" %in% colnames(samples),
 # put together and save study info
 study <- tibble(target = target, region = region, platform = instrument,
                 read_length_bp = read_length, seq_center = seq_center,
-                tax_database = "UNITE", Seq_accn = seq_accn,
+                tax_database = "SILVA v138_1", Seq_accn = seq_accn,
                 samples = n_samples, DOI = DOI, geoloc = loc_list, 
-                primer_f, primer_r, overlapping, paired_end)
+                primer_f, primer_r, overlapping = overlapping, 
+                paired_end = paired_end)
 # saves study info
 write_tsv(study, str_c(Study,"_study.txt"))
 
@@ -595,21 +587,21 @@ write_tsv(study, str_c(Study,"_study.txt"))
 # check naming of the geoloc info
 
 samples <- samples %>%
-  mutate(description = str_c("Wine source tracking", Library.Name, Sample.Name, sep =", "))
+  mutate(description = str_c(env_local_scale, env_medium, Library.Name, sep =", "))
 samples <- samples %>%
   mutate(Sample_Name = Run) 
 
 # information of geoloc (and names of the field) is very inconsistent:
 # check the info in your sample metadata and adatp these commands
 # use these if part or all of the geolocation information is missing
-# samples$geo_loc_name_country <- "your country here"
-# samples$geo_loc_name_country_continent <- "your continent here"
+# samples$geo_loc_name_country <- NA_character_
+# samples$geo_loc_name_country_continent <- NA_character_
 # samples$lat_lon <- NA_character_
 
 
 # create label2 (to avoid numbers as first char.; s. can be removed later with
 # tidyr::separate)
-# need to be adjusted ad hoc
+# needs to be adjusted ad hoc especially for lat_lon
 if(data_type == "sra"){
   samples <- samples %>%
     mutate(label2 = str_c("s.",Sample_Name), target1 = target1, 
@@ -624,14 +616,17 @@ if(data_type == "sra"){
            target2 = target2, SRA_Sample = NA_character_, 
            SRA_run = NA_character_) %>%
     select(Run, label2, n_reads2, n_issues, description, target1, target2, 
-           biosample = Sample_code, geo_loc_country = geo_loc_name_country, 
-           geo_loc_continent = geo_loc_name_continent, lat_lon = Latlon)
+           biosample = Sample_code, geo_loc_country = Country, 
+           geo_loc_continent = Continent, lat_lon, Sample_Name)
 }
+
 
 # save the sample information
 write_tsv(samples, str_c(Study,"_samples.txt"))
 
+
 # extract unique taxa -----------------------------------------------------
+
 
 # a tibble with unique elements for taxonomy
 # some changes are necessary for coherence with FMBN taxonomy
@@ -640,28 +635,62 @@ unique_tax <- taxtab2 %>% select(-ASV) %>% distinct()
 
 # if the tax database is silva v138 class changes are not needed
 
-unique_tax <- taxtab2 %>% select(-ASV) %>% distinct()
+if(!str_detect(study$tax_database, "v138")) {
+  taxa <- unique_tax %>%
+    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
+    mutate(Class = ifelse(Class == "Acidomicrobia", "Acidomicrobiia", Class)) %>%
+    mutate(Class = ifelse(Class == "Coriobacteria", "Coriobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Flavobacteria", "Flavobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Sphingobacteria", "Sphingobacteriia", Class)) %>%
+    mutate(Class = ifelse(Class == "Fusobacteria", "Fusobacteriia", Class)) %>%
+    mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
+                       str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
+                             Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
+           id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
+                          str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
+                                ";o__", Order,  ";f__", Family, ";g__", Genus, 
+                                ";s__", sp_label))) %>%
+    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
+    mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                            "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
+           taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                               "; o__", Order,  "; f__", Family, "; g__", Genus, 
+                               "; s__", sp_label)) %>%
+    mutate(Species = sp_label) %>%
+    select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
+  
+  # found a bug, need to fix labels for some taxa
+  taxa <- taxa %>% mutate(label = case_when(
+    Class == "Acidobacteria (class)" & label == "Acidobacteria" ~ "Acidobacteria (class)",
+    TRUE ~ label
+  ))
+  taxtab2 <- taxtab2 %>% mutate(s_label = case_when(
+    Class == "Acidobacteria (class)" & s_label == "Acidobacteria" ~ "Acidobacteria (class)",
+    TRUE ~ s_label
+  ))
+} else {
+  taxa <- unique_tax %>%
+    mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
+    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
+    mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
+                       str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
+                             Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
+           id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
+                          str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
+                                ";o__", Order,  ";f__", Family, ";g__", Genus, 
+                                ";s__", sp_label))) %>%
+    mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
+    mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                            "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
+           taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
+                               "; o__", Order,  "; f__", Family, "; g__", Genus, 
+                               "; s__", sp_label)) %>%
+    mutate(Species = sp_label) %>%
+    select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
+}
 
-taxa <- unique_tax %>%
-  mutate(Genus = ifelse(Genus == "Incertae_sedis", str_c(Family, Genus, sep = "_"), Genus)) %>%
-  mutate(sp_label = ifelse(Species!="",str_c(Genus, Species),"")) %>%
-  mutate(id = ifelse(Kingdom =="", "Root;k__;c__;f__;g__;s__",
-                     str_c("Root;k__", Kingdom, "__", Phylum, ";c__", 
-                           Class, ";f__", Family, ";g__", Genus, ";s__", sp_label)),
-         id_L6 = ifelse(Kingdom =="", "Root;k__;c__;o__;f__;g__;s__",
-                        str_c("Root;k__", Kingdom, "__", Phylum, ";c__", Class, 
-                              ";o__", Order,  ";f__", Family, ";g__", Genus, 
-                              ";s__", sp_label))) %>%
-  mutate(sp_label = ifelse(Species!="",str_c(Genus, Species, sep = " "),"")) %>%
-  mutate(taxonomy = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                          "; o__; f__", Family, "; g__", Genus, "; s__", sp_label),
-         taxonomy_L6 = str_c("k__", Kingdom, "; p__", Phylum, "; c__", Class,
-                             "; o__", Order,  "; f__", Family, "; g__", Genus, 
-                             "; s__", sp_label)) %>%
-  mutate(Species = sp_label) %>%
-  select(id, label = s_label, Kingdom:Species, taxonomy, id_L6, taxonomy_L6)
 
-write_tsv(taxa, str_c(Study, "taxaFMBN.txt"))        
+write_tsv(taxa, str_c(Study, "taxaFMBN.txt"))         
 
 # prepare OTU and edge tables ---------------------------------------------
 
@@ -714,20 +743,11 @@ write_tsv(seqtab_agsp, str_c(Study,"seqtab_agsp.txt"))
 write_tsv(seqtab_aggp, str_c(Study,"seqtab_aggp.txt"))
 write_tsv(edge_table, str_c(Study,"edge_table.txt"))
 
-
-# create a phyloseq object FMBN style -------------------------------------
-
-FMBN_physeq_OTU <- as.matrix(column_to_rownames(seqtab_ags, var = "s_label"))
-FMBN_physeq_taxa <- as.matrix(column_to_rownames(unique_tax, var = "s_label"))
-FMBN_physeq <- phyloseq(otu_table(FMBN_physeq_OTU, taxa_are_rows = T), 
-                        sample_data(samples),
-                        tax_table(FMBN_physeq_taxa))
-saveRDS(FMBN_physeq, str_c("data/", Study, "_FMBN_ps.rds"))
-
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
 
 # create a list for reprocessing taxonomy if needed
+
 # assembling and saving the list -----------------------------------------------------
 
 # checking if everything which is needed is available ---------------------
@@ -758,37 +778,9 @@ if(all(check_list)){
   cat("\nOne or more of the objects you need is missing, check your data before proceeding\n")
 }
 
-
-
 # save the workspace
 save.image(file = str_c(Study,"_small.Rdata"))
 
-#  save the log -----------------------------------------------------------
-# need to put it at the end of the script because if the script is used
-# on several days, yout ned to reinitialize the log
-if(use_logr){
-  log_path <- file.path(str_c(Study,"log", sep = "_"))
-  log_open(log_path)
-  gen_options <- list(
-    audio = play_audio,
-    sound = sound_n,
-    timing = keep_time,
-    verbose = verbose_output
-  )
-  log_print(gen_options, console = F)
-  study_options <- list(
-    study = Study,
-    target_region <- str_c(target, region, sep = ", "),
-    doi = DOI,
-    Platform = platform
-  )
-  log_print(study_options, console = F)
-  primers <- list(primerf = primer_f,
-                  primerr = primer_r)
-  log_print(primers, console = F)
-  dotree
-  log_close()
-}
 
 # Package citations -------------------------------------------------------
 
@@ -800,11 +792,11 @@ map(c(.cran_packages, .bioc_packages), citation)
 
 # Most of the script is taken from https://benjjneb.github.io/dada2/tutorial.html
 # or https://benjjneb.github.io/dada2/bigdata.html
-# with some changes and adaptations
+# with changes and adaptations
 
 # Assume that this is overall under MIT licence
 
-# Copyright 2021, 2022, 2024 Eugenio Parente
+# Copyright 2021, 2022, 2024, Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 

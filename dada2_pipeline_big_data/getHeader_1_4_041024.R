@@ -37,7 +37,9 @@ paired_end <- T # set to true for paired end, false for single end
 data_type <- "sra" 
 # alternatives are "sra", for data downloaded from sra
 # "novogene_raw", for data obtained from novogene, with primer not removed
-# "novogene_clean", for data obtained from novogene, data with primer removed
+# "novogene_rawa", for data obtained from novogene, with primer  and adapter not removed
+# "novogene_clean", for data obtained from novogene, data with primer removed, 
+#  after merging and chimera removal
 
 # sub-directory data must already be in the wd
 if(data_type == "sra"){
@@ -62,9 +64,11 @@ if(data_type == "sra"){
     if(str_detect(data_type, "clean")){
       file_index <- which(str_detect(file_list[[i]], "effective.fastq.gz"))
     } else {
-      # if you want the seqs without primer and adapter
-      # file_index <- which(!str_detect(file_list[[i]], "raw") & !str_detect(file_list[[i]], "Frags"))
-      file_index <- which(str_detect(file_list[[i]], "raw"))
+      if(str_detect(data_type, "rawa")){
+        file_index <- which(str_detect(file_list[[i]], "raw"))
+      } else {
+        file_index <- which(!str_detect(file_list[[i]], "raw") & !str_detect(file_list[[i]], "Frags"))
+      }
     }
     file_list[[i]]<-file.path(
       fastq_dirs[i],
@@ -94,6 +98,10 @@ sample.names <- case_when(
   all(str_detect(basename(fnFs),"_")) ~ sapply(strsplit(basename(fnFs), "_", fixed = T), `[`, 1),
   all(str_detect(basename(fnFs),".")) ~ sapply(strsplit(basename(fnFs), ".", fixed = T), `[`, 1),
 )
+# ad hoc
+if(data_type == "novogene_rawa"){
+  sample.names <- str_remove(sample.names, "\\.raw")
+}
 
 # the size of the sample of sequences you want to use (see below)
 n <-10
