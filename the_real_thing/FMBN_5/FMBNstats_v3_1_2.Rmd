@@ -1,5 +1,5 @@
 ---
-title: 'FMBN stats: a script for extracting summary statistics from FoodMicrobionet (v5)'
+title: 'FMBN stats: summary statistics from FoodMicrobionet (v5)'
 author: "Prof. E. Parente, Scuola SAFE, Università degli Studi della Basilicata"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 # loading packages
 .cran_packages <- c("tidyverse", "randomcoloR", "knitr", "rnaturalearth",
-                    "rnaturalearthdata")
+                    "rnaturalearthdata", "kableExtra")
 
 .inst <- .cran_packages %in% installed.packages()
 
@@ -37,23 +37,38 @@ dgts <- 3
 
 
 ```{r loading_data}
+FMBN_folder <- "."
+if(FMBN_folder == "."){
+  FMBN_plus <- readRDS("FMBN_plus.rds")
+} else {
+  FMBN_plus <- readRDS(file.path(FMBN_folde, "FMBN_plus.rds"))
+}
 
-FMBN_plus <- readRDS("FMBN_plus.rds")
-
+# setting save option
+save_graph <- F
 ```
 
 # FMBN statistics.  
 
-This report is designed to provide summary statistics for FoodMicrobionet, version 5.0 or higher. It takes as an input the FMBN_plus list and returns text, tables and graphs.  
+This report is designed to provide summary statistics for FoodMicrobionet, version 5.1 or higher. It takes as an input the FMBN_plus list and returns text, tables and graphs.  
 These results are for FoodMicrobionet version `r FMBN_plus$version_n`.  
+
+```{r get_basic_stats}
+n_studies <- nrow(FMBN_plus$studies)
+n_fungi_only <- nrow(dplyr::filter(FMBN_plus$studies, !str_detect(target, "16S")))
+n_bacteria_only <- dplyr::filter(FMBN_plus$studies, !str_detect(target, "ITS|18S|26S")) |> nrow()
+n_fungi_and_bacteria <- n_studies - (n_fungi_only + n_bacteria_only)
+n_fungi <- n_studies - n_bacteria_only
+n_bacteria <- n_studies - n_fungi_only
+```
 
 
 # Statistics on studies.
 
-The number of studies in FMBN is `r nrow(FMBN_plus$studies)`. This version includes studies on fungal microbiota only (`r nrow(dplyr::filter(FMBN_plus$studies, !str_detect(target, "16S")))`), on bacterial microbiota only (`r nrow(dplyr::filter(FMBN_plus$studies, !str_detect(target, "ITS")))`) and studies for which both data for bacterial and fungal microbiota are available `r nrow(FMBN_plus$studies) - nrow(dplyr::filter(FMBN_plus$studies, !str_detect(target, "16S"))) - nrow(dplyr::filter(FMBN_plus$studies, !str_detect(target, "ITS")))`. However, due to inconsistencies in the deposit of sequences in SRA (in several cases the same sample was deposited with two separate biosample accessions and/or data for bacteria and fungi were deposited with different bioproject of study accessions), the same samples might be present in two studies, one for bacteria and one for fungi^[by convention in FoodMicrobionet a study must have a unique bioproject accession and a sample a unique biosample accession]. We did our best to match samples in these situations. The addition of datasets on fungi is in progress and, when available, we will progressively add fungal data for all the studies which are already in FoodMicrobionet with bacterial community data and add more fungal studies.  
+The number of studies in FMBN is `r n_studies`. This version includes studies on fungal microbiota only (`r n_fungi_only`), on bacterial microbiota only (`r n_bacteria_only`) and studies for which both data for bacterial and fungal microbiota are available `r n_fungi_and_bacteria`. Overall, the studies including data on bacterial microgiota are `r n_bacteria` and those on fungal microbiota are `r n_fungi`. However, due to inconsistencies in the deposit of sequences in SRA (in several cases the same sample was deposited with two separate biosample accessions and/or data for bacteria and fungi were deposited with different bioproject of study accessions), the same samples might be present in two studies, one for bacteria and one for fungi^[by convention in FoodMicrobionet a study must have a unique bioproject accession and a sample a unique biosample accession]. We did our best to match samples in these situations. The addition of datasets on fungi is in progress. Compared to version 5.0, the first which included data on fungi, which included only data on fungal microbiota of alcoholic beverages and related biomes, this version includes data on fungal communities from a variety o foods. 
+The following figures show the increase of number of studies and samples in FMBN versions. Please note that, whenever new data (fungal or bacterial) were added to an existing study, the version refers to the most recent iteration of the study.  
 
 ```{r growth_studies, dpi=150}
-
 growth_FMBN <- FMBN_plus$studies %>%
   group_by(FMBN_version) %>%
   summarise(nstudies = n(),
@@ -62,7 +77,10 @@ growth_FMBN <- FMBN_plus$studies %>%
   mutate(cum_sum_studies = cumsum(nstudies),
          cum_sum_samples = cumsum(nsamples))
 # the table
-growth_FMBN
+kable(growth_FMBN,
+      caption = "The growth of FMBN",
+      col.names = c("version", "studies", "samples", "cum. sum. studies", "cum. sum. samples")) |>
+  kable_classic()
 
 # the graph for studies
 ggplot(growth_FMBN) +
@@ -74,7 +92,10 @@ ggplot(growth_FMBN) +
   ) + 
    scale_y_continuous(limits = c(0,300)) +
   theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+if(save_graph) ggsave(filename = "growthFMBNstudies.jpg")
 ```
 
 
@@ -89,35 +110,36 @@ ggplot(growth_FMBN) +
   ) + 
   scale_y_continuous(limits = c(0,20000)) +
   theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
 ```
 
-The largest growth in studies and samples has been between version 3.1 (published in 2019) and version 3.2 (unpublished). Note that some older studies were annotated as belonging to version 5.0 or 5_0_1 when fungal data were added.   
+The largest growth in studies and samples has been between version 3.1 (published in 2019) and version 3.2 (unpublished). 
 
 ## Platforms, gene target, regions.  
 
-FMBN grows by addition of sequences deposited in NCBI SRA for published studies. As a consequence, use of targets (16S RNA, 16S RNA gene, ITS) reflect what is published and the correlation between platforms and targets.  
+FMBN grows by addition of sequences deposited in NCBI SRA for published studies. As a consequence, use of targets (16S RNA, 16S RNA gene, ITS, 18S, 26S) reflect what is published and the correlation between platforms and targets. However, FMBN does not currently include studies using Oxford Nanopore or PacBio platforms for full-length sequencing.    
 
 ```{r platform_vs_time, dpi = 150}
 
-platform_region <- dplyr::select(FMBN_plus$studies, platform, region, samples, year)
+platform_region <- FMBN_plus$studies |> dplyr::select(platform, target, region, samples, year)
 
-platform_region <- platform_region %>%
+platform_region <- platform_region |>
   mutate(
     platform_2 = case_when(
       str_detect(platform, "454 GS") ~ "454 GS",
       str_detect(platform, "Illumina") ~ "Illumina",
       str_detect(platform, "Ion Torrent") ~ "Ion Torrent"
     )
-  ) %>%
+  ) |>
   mutate(year = as.numeric(year))
 
 
 # platforms vs time
-platform_time <- platform_region %>%
-  group_by(platform_2, year) %>%
-  dplyr::filter(!is.na(year)) %>%
+platform_time <- platform_region |>
+  group_by(platform_2, year) |>
+  dplyr::filter(!is.na(year)) |>
   tally()
 
 # make a mini df
@@ -150,8 +172,11 @@ platform_time_2 %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = p
   theme_bw() +
   scale_x_continuous(breaks = seq(minyear, maxyear,2), minor_breaks = seq(minyear, maxyear, 1)) +
   theme(plot.title = element_text(hjust = 0.5))
+
+if(save_graph) ggsave(filename = "growthFMBNstudies_platform.jpg")
 ```
-Recently, the number of studies using Illumina newer platforms (other than MiSeq) is growing quickly.  
+
+Recently, the number of studies using Illumina newer platforms (other than MiSeq) is growing quickly. We have done our best to address related problems (binned quality scores) by adapting our pipeline.   
 
 The regions used as targets also reflects the use of different platforms and the preference for a given target (V4 and V3-V4), at least for bacteria. Data for fungi are still not sufficient to define a trend.  
 The following table reports the number of studies available for each platform and the cross-tabulation of studies by gene target and platform.   
@@ -159,35 +184,62 @@ The following table reports the number of studies available for each platform an
 
 ```{r platform_region_table}
 # a table
-platform_region %>% group_by(platform_2) %>% 
-  count(platform_2) %>%
-  ungroup() %>%
-  mutate(prop =prop.table(n))
-addmargins(xtabs(~ region + platform_2, platform_region))
+platform_region |> group_by(platform_2) |> 
+  count(platform_2) |>
+  ungroup() |>
+  mutate(prop =prop.table(n)) |>
+  kable(
+    col.names= c("platform", "n", "proportion"),
+    caption = "Number of studies, by platform.",
+    digits = c(0,1,3)) |>
+  kable_classic()
+
+xtabs(~ region + target + platform_2, platform_region) |>
+  as_data_frame() |>
+  select(platform_2, target, region, n) |>
+  dplyr::filter(n>0) |>
+  kable(
+    col.names= c("platform", "target", "region", "n"),
+    caption = "Number of studies, by gene target, region and platform.") |>
+  kable_classic()
 ```
+
 A large number of studies targets V3-V4 or V4 for bacteria and ITS1 for fungi.  
 
 
 ```{r platform_region_B_F}
 # need to do this separately for bacteria and fungi
 
-platform_region_BF <- platform_region %>%
+platform_region_BF <- platform_region |>
   mutate(region=str_trim(region, "both")) |>
-  mutate(region_B = if_else(!str_detect(region, "V"), NA_character_, 
-                            region)) %>%
-  mutate(region_B = str_remove(region_B, pattern = "ITS1 and ")) %>%
-  mutate(region_B = str_remove(region_B, pattern = "ITS2 and ")) %>%
+  mutate(region_B = if_else(!str_detect(target, "16S"), NA_character_, 
+                            region)) |>
+  mutate(and_pos = str_locate(region_B, "and")[,2]) |>
+  mutate(region_B = if_else(is.na(region_B) | ! str_detect(region_B, "and"),
+                                  region_B,
+                                  str_sub(region_B,and_pos+2)
+                            )
+         ) |>
   mutate(region_F = if_else(str_detect(region, "ITS"), 
                             str_extract(region, pattern = "ITS(1|2)"), 
                             NA_character_)) |>
+  mutate(region_F = if_else(!str_detect(target, "18S|26S"), 
+                            region_F, 
+                            str_sub(region, 1, and_pos-4))) |>
+  mutate(region_F = if_else(target == "26S RNA gene", 
+                            region, 
+                            region_F))|>
+  mutate(region_F = if_else(target == "18S RNA gene", 
+                            region, 
+                            region_F))|>
   arrange(year)
-# ad hoc
-platform_region_BF$region_B[97]<-"V4"
 
 platform_region_B <- platform_region_BF |>
-  dplyr::filter(!is.na(region_B))
+  dplyr::filter(!is.na(region_B)) |>
+  select(-region_F)
 platform_region_F <- platform_region_BF |>
-  dplyr::filter(!is.na(region_F))
+  dplyr::filter(!is.na(region_F)) |>
+  select(-region_B)
 
 # targets vs time, B
 region_time_B <- platform_region_B %>%
@@ -213,7 +265,7 @@ region_B_targets <- region_time_2_B |>
   mutate(prop_region = sum_n/sum(sum_n)) |>
   arrange(desc(prop_region))
 
-region_time_2_B %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = region)) +
+region_time_2_B |> ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = region)) +
   geom_area() +
   labs(
     x = "year",
@@ -227,8 +279,8 @@ region_time_2_B %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = r
   scale_x_continuous(breaks = seq(minyear, maxyear,2), minor_breaks = seq(minyear, maxyear, 1)) +
   theme(plot.title = element_text(hjust = 0.5))
 
-# ggsave(filename = "region_time.tiff", dpi = 300)
 
+if(save_graph) ggsave(filename = "region_time_bacteria.jpg")
 ```
 
 The distribution of studies by platform and region reflect current practices in metataxonomic analysis of food microbial communities. With phasing out of 454 GS (most studies targeted V1-V3), the majority of studies for bacteria is now Illumina with either V3-V4 (which alone make `r round(region_B_targets$prop_region[1]*100,2)`% of studies) or V1-V3 (`r round(region_B_targets$prop_region[2]*100,2)`%).
@@ -238,46 +290,48 @@ Data for fungi are summarized below:
 ```{r region_target_fungi, dpi = 150}
 
 # targets vs time, F
-region_time_F <- platform_region_F %>%
-  dplyr::filter(!is.na(year)) %>%
-  group_by(region_F, year) %>%
-  tally()
-regions_F <- unique(region_time_F$region_F)
-regions_0_F <- tibble(
-  year = rep(minyear:maxyear, length(regions_F)),
-  region = rep(regions_F, each = maxyear-minyear+1),
-  n1 = rep(0, (maxyear-minyear+1)*length(regions_F))
-)
-# merge the two and create cumulative sum
-region_time_2_F <- left_join(regions_0_F, rename(region_time_F, region =region_F)) %>%
-  mutate(n = ifelse(is.na(n),0,n)) %>% 
-  group_by(region) %>%
-  mutate(cum_sum_studies = cumsum(n)) 
+region_time_F <- platform_region_F |>
+  mutate(region_F = case_when(
+    str_detect(target, "ITS") ~ region_F,
+    str_detect(target, "18S") ~ str_c("18S",region_F, sep = ", "),
+    str_detect(target, "26S") ~ str_c("26S",region_F, sep = ", ")
+  )
+) |>
+  dplyr::filter(!is.na(year)) |>
+  group_by(region_F, year) |>
+  tally() |>
+  ungroup()
 
-region_F_targets <- region_time_2_F |>
-  ungroup() |>
-  summarise(sum_n = sum(n), .by = region) |>
-  mutate(prop_region = sum_n/sum(sum_n)) |>
-  arrange(desc(prop_region))
+region_time_2_F <- region_time_F |>
+  complete(region_F, year, fill = list(n=0)) |>
+  group_by(region_F) |>
+  arrange(year) |>  # Arrange by year so adding works
+  mutate(cum_sum_studies = cumsum(n)) |> 
+  arrange(year) |>
+  ungroup()
 
-# need to use 
 
-region_time_2_F %>% ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = region)) +
-  geom_area() +
+region_time_2_F |> 
+  ggplot(mapping = aes(x = year, y = cum_sum_studies, fill = fct_rev(region_F))) +
+  geom_area(position = "stack") +
   labs(
     x = "year",
     y = "cumulative number of studies",
     fill = "target",
-    title = "The growth of FMBN, studies, by ITS region"
+    title = "Growth of FMBN studies for fungi by region"
   ) + 
   scale_fill_brewer(type = "qual", palette = "Paired") +
-  scale_y_continuous(limits = c(0,40)) +
   theme_bw() +
   scale_x_continuous(breaks = seq(minyear, maxyear,2), minor_breaks = seq(minyear, maxyear, 1)) +
   theme(plot.title = element_text(hjust = 0.5))
+
+if(save_graph) ggsave(filename = "region_time_fungi.jpg")
 ```
 However, data for fungi in FoodMicrobionet are still too scarse to draw any conclusion of target preferences.  
 
+## Studies by group. 
+
+The following graph illustrates the number of studies by food group (as defined in FMBN table specs).  
 
 ```{r studies_by_food_group}
 # a table
@@ -286,17 +340,57 @@ FMBN_plus$studies %>% group_by(food_group) %>%
   ungroup() %>%
   mutate(prop = round(prop.table(n), dgts)) %>%
   arrange(desc(prop)) %>%
-  mutate(cum_prop = round(cumsum(prop), dgts-1))
+  mutate(cum_prop = round(cumsum(prop), dgts-1)) |>
+  kable(caption = "Studies, by food group bacteria and fungi",
+        col.names = c("food group", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
 ```
 
-The majority of studies is on dairy products.  
+The majority of studies is on dairy products and the proportion of studies is definitely not balanced by food group. This is inevitable since the studies in FMBN reflect those which have sequences deposited in SRA/ENA.  
+The same analysis is presented separately for bacterial and fungal communities.  
+
+```{r studies_by_food_group_2}
+# a table
+FMBN_plus$studies |> 
+  dplyr::filter(str_detect(target, "16S")) |>
+  group_by(food_group) |> 
+  count(food_group) |>
+  ungroup() |>
+  mutate(prop = round(prop.table(n), dgts)) |>
+  arrange(desc(prop)) |>
+  mutate(cum_prop = round(cumsum(prop), dgts-1)) |>
+  kable(caption = "Studies, by food group, bacteria",
+        col.names = c("food group", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
+
+FMBN_plus$studies |> 
+  dplyr::filter(str_detect(target, "ITS|18S|26S")) |>
+  group_by(food_group) |> 
+  count(food_group) |>
+  ungroup() |>
+  mutate(prop = round(prop.table(n), dgts)) |>
+  arrange(desc(prop)) |>
+  mutate(cum_prop = round(cumsum(prop), dgts-1)) |>
+  kable(caption = "Studies, by food group, fungi",
+        col.names = c("food group", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
+```
 
 
 # Statistics on samples.  
 
-The number of samples in FMBN has been rising almost exponentially with time and it is now `r max(max(FMBN_plus$samples_B$sampleId, na.rm =T), max(FMBN_plus$samples_F$sampleId, na.rm =T))`. There are `r nrow(FMBN_plus$samples_B)` samples with data on bacteria, `r nrow(FMBN_plus$samples_F)` samples with data on fungi. For `r nrow(dplyr::filter(FMBN_plus$samples_B, !is.na(matchId)))` samples we were able to match samples for bacteria and fungi.  
+```{r stat_samples_1}
+max_samples <- max(max(FMBN_plus$samples_B$sampleId, na.rm =T), max(FMBN_plus$samples_F$sampleId, na.rm =T))
+sample_B <- nrow(FMBN_plus$samples_B)
+sample_F <- nrow(FMBN_plus$samples_F)
+matched_samples <- nrow(dplyr::filter(FMBN_plus$samples_B, !is.na(matchId)))
 
-FMBN is the richest database in terms of number of samples for foods and food environments, and it is also the best annotated one.
+```
+
+
+The number of samples in FMBN has been rising almost exponentially with time and it is now `r max_samples`. There are `r sample_B` samples with data on bacteria, `r sample_F` samples with data on fungi. For `r matched_samples` samples we were able to match samples for bacteria and fungi.  
+
+FMBN is the richest database in terms of number of samples for foods and food environments, and it is also the best annotated one. However, its taxonomic resolution is limited and, with the accumulation of data on full length sequences and on shotgun datasets may soon become outdated.  
 
 ## Statistics by food group.  
 
@@ -315,8 +409,37 @@ sample_tab_byL1 <- samples %>%
   arrange(desc(n)) %>%
   mutate(prop=n/sum(n)) %>%
   mutate(cumprop = cumsum(prop))
-kable(sample_tab_byL1, digits = c(0,4,4,4))
+kable(caption = "Number and proportion of samples by L1 level of FoodEx2 classification, bacteria and fungi", 
+      sample_tab_byL1, digits = c(0,4,4,4),
+      col_names = c("L1", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
+
+FMBN_plus$samples_B |>
+  group_by(L1) %>%
+  count(L1) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop)) |>
+  kable(caption = "Number and proportion of samples by L1 level of FoodEx2 classification, bacteria", 
+        digits = c(0,4,4,4),
+        col_names = c("L1", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
+
+FMBN_plus$samples_F |>
+  group_by(L1) %>%
+  count(L1) %>%
+  ungroup() %>%
+  arrange(desc(n)) %>%
+  mutate(prop=n/sum(n)) %>%
+  mutate(cumprop = cumsum(prop)) |>
+  kable(caption = "Number and proportion of samples by L1 level of FoodEx2 classification, fungi", 
+        digits = c(0,4,4,4),
+        col.names = c("L1", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
+  
 ```
+
 
 ```{r samples_2}
 # how many different foodIds in samples (excluding environments)
@@ -356,7 +479,8 @@ ggplot(samples, mapping = aes(x = target2, y = log10(n_reads2))) +
        title = "Distribution of reads per sample, by region") +
   scale_y_continuous(breaks = seq(0,7,1)) +
   theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
 # ggsave(filename = "reads_by_region.tiff", dpi = 300)
 
@@ -389,7 +513,13 @@ table_by_continent <- samples %>%
   arrange(desc(n)) %>%
   mutate(prop=n/sum(n)) %>%
   mutate(cumprop = cumsum(prop))
-kable(table_by_continent, digits = c(0,4,4,4))
+table_by_continent |>
+  kable( 
+    col.names = c("continent", "n", "prop.", "cum. prop."),
+    digits = c(0,4,4,4),
+    caption = "FMBN samples, by continent"
+  ) |>
+  kable_classic()
 # creating a table for countries
 table_by_country <- samples %>%
   group_by(geo_loc_country) %>%
@@ -399,7 +529,11 @@ table_by_country <- samples %>%
   mutate(prop=n/sum(n)) %>%
   mutate(cumprop = cumsum(prop),
          geo_loc_country = if_else(geo_loc_country == "USA", "United States of America", geo_loc_country))
-kable(table_by_country, digits = c(0,4,4,4))
+kable(table_by_country, 
+      caption = "FMBN samples, by country",
+      col.names = c("country", "n", "prop.", "cum. prop."),
+      digits = c(0,4,4,4)) |>
+  kable_classic()
 
 world_2 <- left_join(world, 
                      dplyr::select(table_by_country, sovereignt=geo_loc_country, n_samples = n)) %>%
@@ -421,9 +555,10 @@ ggplot(data = world_2) +
                      FMBN_plus$version_n, sep = " ")) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5))
-
-# ggsave(filename = "nsamples_by_country.tiff", dpi = 300, units = "in", width = 9, height = 5)
-# ggsave(filename = "nsamples_by_country.jpg", dpi = 300)
+if(save_graph){
+  ggsave(filename = "nsamples_by_country.tiff", dpi = 300, units = "in", width = 9, height = 5)
+  ggsave(filename = "nsamples_by_country.jpg", dpi = 300)
+}
 
 ```
 
@@ -431,7 +566,7 @@ These statistics can be easily calculated separately for bacteria and fungi.
 
 # Statistics for taxa.  
 
-For all studies belonging to version 1.1 or higher, FoodMicrobionet was created by a dedicated pipeline using SILVA for taxonomic assignment; from version 5.0 UNITE was used as a taxonomic reference for ITS sequences for fungi. A few tweaks on taxonomy are needed for coherence and for compatibility with external databases.  
+For all studies belonging to version 1.1 or higher, FoodMicrobionet was created by a dedicated pipeline using SILVA for taxonomic assignment; from version 5.0 UNITE was used as a taxonomic reference for ITS sequences for fungi. From version 5.1 studies targeting 18S or 26S RNA genes for fungi were added and a custom taxonomic database derived from SILVA v.138.2 was used. A few tweaks on taxonomy are needed for coherence and for compatibility with external databases.  
 
 We always try to assign sequences to the lowest possible level (given the length of sequences and their quality). Statistics for taxonomic assignment are shown below.  
 
@@ -448,7 +583,11 @@ table_by_idelevel_B <- taxa |>
   arrange(desc(n)) |>
   mutate(prop=n/sum(n)) |>
   mutate(cumprop = cumsum(prop))
-kable(table_by_idelevel_B, digits = c(0,3,3,3), caption = "Taxonomic assignment, by taxonomic level, bacteria")
+kable(table_by_idelevel_B, 
+      digits = c(0,3,3,3), 
+      caption = "Taxonomic assignment, by taxonomic level, bacteria",
+      col.names = c("ide. level", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
 
 table_by_idelevel_F <- taxa |>
   dplyr::filter(domain == "Fungi") |>
@@ -458,7 +597,11 @@ table_by_idelevel_F <- taxa |>
   arrange(desc(n)) |>
   mutate(prop=n/sum(n)) |>
   mutate(cumprop = cumsum(prop))
-kable(table_by_idelevel_F, digits = c(0,3,3,3), caption = "Taxonomic assignment, by taxonomic level, fungi")
+kable(table_by_idelevel_F, 
+      digits = c(0,3,3,3), 
+      caption = "Taxonomic assignment, by taxonomic level, fungi",
+      col.names = c("ide. level", "n", "prop.", "cum. prop.")) |>
+  kable_classic()
 ```
 
 There are currently `r (nrow(taxa)-1)` taxa in this version of FoodMicrobionet, identified at different identification levels. The proportion of taxa identified at the genus level or below is `r round(table_by_idelevel_B$cumprop[2],3)` for bacteria and `r round(table_by_idelevel_F$cumprop[2],3)` for fungi.   
@@ -478,7 +621,11 @@ table_by_phyla_B <- taxa |>
          cumn = cumsum(n)) 
 
 
-kable(table_by_phyla_B, digits = c(0,4,4,4), caption = "Proportion by phyla, Bacteria and Archaea")
+kable(table_by_phyla_B, 
+      digits = c(0,4,4,4), 
+      caption = "Proportion by phyla, Bacteria and Archaea",
+      col.names = c("phylum", "n", "prop.", "cum. prop.", "cum. sum.")) |>
+  kable_classic()
 
 table_by_phyla_F <- taxa |>
   dplyr::filter(domain == "Fungi" &!is.na(phylum)) |>
@@ -491,7 +638,10 @@ table_by_phyla_F <- taxa |>
          cumn = cumsum(n)) 
 
 
-kable(table_by_phyla_F, digits = c(0,4,4,4), caption = "Proportion by phyla, Fungi")
+kable(table_by_phyla_F, digits = c(0,4,4,4), 
+      caption = "Proportion by phyla, Fungi",
+      col.names = c("phylum", "n", "prop.", "cum. prop.", "cum. sum.")) |>
+  kable_classic()
 
 ```
   
@@ -501,7 +651,7 @@ The variety of taxa detected is very high, especially for Bacteria and Archaea. 
 
 The depth of taxonomic assignment depends on a number of factors (quality and length of the sequences, quality of the reference database, etc.). Here, we will present tables and graphs on this subject, for bacteria only (UNITE results far more often in taxonomic assignments at the species level, even for short sequences).  
 
-```{r get_edges_bacteria}
+```{r get_edges_bacteria, message = F}
 
 # get the edges for all studies for which dada2 was used for processing and which include bacteria but not fungi
 
@@ -532,14 +682,16 @@ edges_sel_ann <- left_join(
 
 edges_sel_ann <- left_join(
   edges_sel_ann, 
-  select(taxa, taxonId:species, idelevel)
+  select(taxa, taxonId:species, idelevel),
+  multiple = "first"
 )
 
 # annotate with further info from studies
 
 edges_sel_ann <- left_join(
   edges_sel_ann, 
-  select(FMBN_plus$studies, studyId, overlapping)
+  select(FMBN_plus$studies, studyId, overlapping),
+  multiple = "first"
 )
 
 # create a variable with region/overlap
@@ -562,22 +714,20 @@ edges_sel_ann <- edges_sel_ann |>
 # get average number of issues and sequence length by study
 issues_length <- FMBN_plus$studies |>
   dplyr::filter(studyId %in% studyIds_dada2) |>
-  select(studyId, read_length_bp, target, region_2 = region, overlapping) |>
-  mutate(region = str_remove(region_2, pattern = "ITS(1|2) and "))
+  select(studyId, read_length_bp) 
 
 ave_issues <- FMBN_plus$samples_B |> 
   dplyr::filter(sampleId %in% sampleIds_dada2) |>
   group_by(studyId) |>
   summarize(ave_issues = mean(n_issues))
-issues_length <- left_join(issues_length, ave_issues) |>
-  unite(col = "target2", region, overlapping, remove = F)
+issues_length <- left_join(issues_length, ave_issues)
 
 summary_tab_edges <- edges_sel_ann |>
   select(studyId, n_issues, L1:seqs) |>
-  group_by(studyId, .drop = F) 
+  group_by(studyId, target, .drop = F) 
 
 summary_tab_edges_unw <- summary_tab_edges |>
-  count(idelevel) |>
+  count(idelevel, .drop = F) |>
   mutate(freq = n/sum(n))
 
 summary_tab_edges_w <- summary_tab_edges |>
@@ -586,12 +736,13 @@ summary_tab_edges_w <- summary_tab_edges |>
 
 summary_tab_edges_both <- left_join(summary_tab_edges_unw,
                                     select(summary_tab_edges_w,
-                                           studyId, idelevel, nw = n, freqw = freq))
+                                           studyId, idelevel, nw = n, freqw = freq),
+                                    multiple = "first")
 
 # join region and seq length and issues
 
 summary_tab_edges_both_ann <- left_join(summary_tab_edges_both,
-                                        issues_length)
+                                        issues_length, multiple = "first")
 ```
 
 After some processing to obtain the information from the various tables, here is a box plot showing identifications at the genus level or below, by region, for bacteria only.  
@@ -600,16 +751,18 @@ After some processing to obtain the information from the various tables, here is
 # here I need magrittr pipe
 summary_tab_edges_both_ann_sg <- summary_tab_edges_both_ann %>%
   dplyr::filter(idelevel == "genus" | idelevel == "species") %>%
-  group_by(studyId, .drop = F) %>%
+  group_by(studyId, target, .drop = F) %>%
   summarize(freq_sg = sum(freq),
             freq_sgw = sum(freqw)) %>%
   left_join(., issues_length)
 
+
+
 # medians by region, only those including V3 or V4
 summaries <- summary_tab_edges_both_ann_sg |> 
-  dplyr::filter(str_detect(target2, "V3") | str_detect(target2, "V4")) |>
+  dplyr::filter(str_detect(target, "V3") | str_detect(target, "V4")) |>
   ungroup() |>
-  group_by(target2) |> 
+  group_by(target) |> 
   summarize(n = n(),
             medianfreq = median(freq_sg),
             medianfreqw = median(freq_sgw),
@@ -618,7 +771,7 @@ summaries <- summary_tab_edges_both_ann_sg |>
 # summaries_all
 summaries_all <- summary_tab_edges_both_ann_sg |> 
   ungroup() |>
-  group_by(target2) |> 
+  group_by(target) |> 
   summarize(n = n(),
             medianfreq = median(freq_sg),
             medianfreqw = median(freq_sgw),
@@ -628,16 +781,16 @@ summaries_all <- summary_tab_edges_both_ann_sg |>
 
 # now only for species, with overlapping true
 summary_species <- summary_tab_edges_both_ann |>
-  dplyr::filter(str_detect(target2, "TRUE")) |>
+  dplyr::filter(str_detect(target, "TRUE")) |>
   dplyr::filter(idelevel == "species") |>
-  group_by(studyId, .drop = F) |>
+  group_by(studyId, target, .drop = F) |>
   summarize(freq_sg = sum(freq),
             freq_sgw = sum(freqw)) %>%
   left_join(., issues_length)
 
 summary_species_table <- summary_species |> 
   ungroup() |>
-  group_by(target2) |> 
+  group_by(target) |> 
   summarize(n = n(),
             medianfreq = median(freq_sg),
             medianfreqw = median(freq_sgw),
@@ -646,39 +799,41 @@ summary_species_table <- summary_species |>
 # write_tsv(summary_species_table, "idefreqspecies.txt")
 
 
-ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target2, y = freq_sg)) +
+ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target, y = freq_sg)) +
   geom_boxplot() + 
-  geom_jitter(mapping = aes(color = ave_issues)) +
+  geom_jitter(mapping = aes(color = ave_issues), alpha = I(0.5)) +
   labs(x = "target region",
     y = "species + genus freq.",
     color = "ave. issues") +
-  scale_y_continuous(breaks = seq(0.6, 1, 0.05), minor_breaks = seq(0.6, 1, 0.01)) +
+  scale_y_continuous(breaks = seq(0.5, 1, 0.05), minor_breaks = seq(0.6, 1, 0.025)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-# ggsave("idefreqgenspunw.tiff", dpi = 600)
+
+if(save_graph) ggsave("idefreqgenspunw.tiff", dpi = 300)
 ```
 
 Longer sequences for which a good overlap was obtained in paired end sequences (_TRUE) clearly result in a higher proportion of taxonomic assignments at the genus level or below. There is some relationship with the quality of sequences /number of issues encountered during bioinformatic processing: with more issues, in general, the quality of taxonomic assignment is worse, but this is not always true.  
 However, if one keeps into account the number of sequences rather than just counting the ASVs for which assignment at the genus level or below level was possible, it is clear that a high proportion of total sequences received taxonomic assignment at the genus level or below.  
 
 ```{r weighed_box_plot, dpi = 150}
-ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target2, y = freq_sgw)) +
+ggplot(summary_tab_edges_both_ann_sg, mapping = aes(x = target, y = freq_sgw)) +
   geom_boxplot() + 
-  geom_jitter(mapping = aes(color = ave_issues)) +
+  geom_jitter(mapping = aes(color = ave_issues), alpha = I(0.6)) +
   labs(x = "target region",
        y = "species + genus freq., weighted",
        color = "ave. issues") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-# ggsave("idefreqgenspw.tiff", dpi = 600)
+
+if(save_graph) ggsave("idefreqgenspw.tiff", dpi = 300)
 ```
 ```{r more_V3, dpi = 150, eval = F}
 # only those containing V3 or V4, not V5
 summary_tab_edges_both_ann_sg |>
-  dplyr::filter(!str_detect(target2, "V5") & !str_detect(target2, "V6")) |>
-  ggplot(mapping = aes(x = target2, y = freq_sgw)) +
+  dplyr::filter(!str_detect(target, "V5") & !str_detect(target, "V6")) |>
+  ggplot(mapping = aes(x = target, y = freq_sgw)) +
   geom_boxplot() + 
-  geom_jitter(mapping = aes(color = ave_issues)) +
+  geom_jitter(mapping = aes(color = ave_issues), alpha = I(0.6)) +
   labs(x = "target region",
        y = "species + genus freq., weighted",
        color = "ave. issues") +
@@ -688,7 +843,7 @@ summary_tab_edges_both_ann_sg |>
 
 ```
 
-It is very likely that this situation may depend on biases in the composition of reference taxonomic databases (in this case SILVA v138.1), in which the number of sequences varies widely in different taxonomic groups.  
+It is very likely that this situation may depend on biases in the composition of reference taxonomic databases (in this case SILVA v138.2), in which the number of sequences varies widely in different taxonomic groups.  
 
 The ability to obtain a taxonomic assignment down to the genus level varies by phylum. Only the 4 most abundant phyla are shown.   
 
@@ -707,7 +862,7 @@ four_abundant_phyla <- abundant_phyla |>
 summary_tab_edges_4phyla <- edges_sel_ann |>
   select(studyId, n_issues, L1:seqs) |>
   dplyr::filter(phylum %in% four_abundant_phyla) |>
-  group_by(studyId, phylum, .drop = F) 
+  group_by(studyId, target, phylum, .drop = F) 
 
 summary_tab_edges_4phyla_unw <- summary_tab_edges_4phyla |>
   count(idelevel) |>
@@ -719,18 +874,18 @@ summary_tab_edges_w_4phyla <- summary_tab_edges_4phyla |>
 
 summary_tab_edges_4_phyla_both <- left_join(summary_tab_edges_4phyla_unw,
                                     select(summary_tab_edges_w_4phyla,
-                                           studyId, phylum, idelevel, nw = n, freqw = freq))
+                                           studyId, phylum, target,idelevel, nw = n, freqw = freq))
 
 summary_tab_edges_4_phyla_both_sg <- summary_tab_edges_4_phyla_both |>
   ungroup() |>
   dplyr::filter(idelevel == "genus" | idelevel == "species") |>
-  group_by(studyId, phylum, .drop = F) |>
+  group_by(studyId, target, phylum, .drop = F) |>
   summarize(freq_sg = sum(freq),
             freq_sgw = sum(freqw)) %>%
   left_join(., issues_length)
 
 ggplot(summary_tab_edges_4_phyla_both_sg, mapping = aes(x = phylum, y = freq_sg)) +
-  facet_wrap(~target2) +
+  facet_wrap(~target) +
   geom_boxplot() + 
   geom_jitter(alpha = 0.5) +
   labs(x = "phylum",
@@ -738,16 +893,16 @@ ggplot(summary_tab_edges_4_phyla_both_sg, mapping = aes(x = phylum, y = freq_sg)
        color = "ave. issues") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-# ggsave("idefreqgenspunw_phylum.tiff", dpi = 600)
+if(save_graph) ggsave("idefreqgenspunw_phylum.tiff", dpi = 300)
 ```
 
 This is even more evident if the data are weighted using the number of sequences and if only the most common target regions are used.  
 
-```{r weighted_by_phylum, dpi = 1506}
+```{r weighted_by_phylum, dpi = 150}
 summary_tab_edges_4_phyla_both_sg |>
-  dplyr::filter(!str_detect(target2, "V5") & !str_detect(target2, "V6") & !str_detect(target2, "V2")) |>
+  dplyr::filter(!str_detect(target, "V5") & !str_detect(target, "V6") & !str_detect(target, "V2")) |>
   ggplot(mapping = aes(x = phylum, y = freq_sgw)) +
-  facet_wrap(~target2) +
+  facet_wrap(~target) +
   geom_boxplot() + 
   geom_jitter(alpha = 0.5) +
   labs(x = "phylum",
@@ -755,13 +910,13 @@ summary_tab_edges_4_phyla_both_sg |>
        color = "ave. issues") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-# ggsave("idefreqgenspw_phylum.tiff", dpi = 600)
+if(save_graph) ggsave("idefreqgenspw_phylum.tiff", dpi = 600)
 ```
 Taxonomic assignment down to the genus level is clearly worse for Actinobacterota and Bacteroidota and region V1-V3 tipycally results in a higher proportion of taxonomic assignments down to the genus level. However, this is likely to be confounded with the taxonomic platform.  
 
 # Credits and copyright.
 
-This is version 3.1 of the script, 4/9/2024.  
+This is version 3.1.2 of the script, 17/06/2025.  
 
 Assume that the code in this document is overall under MIT licence
 
@@ -781,7 +936,8 @@ sapply(.cran_packages, citation)
 ## Citations for FoodMicrobionet. 
 
 ```{r FoodMicrobionet_refs}
-kable(FMBN_plus$references[,2:3], col.names = c("Reference", "DOI"))
+kable(FMBN_plus$references[,2:3], col.names = c("Reference", "DOI")) |>
+  kable_classic()
 
 ```
 
