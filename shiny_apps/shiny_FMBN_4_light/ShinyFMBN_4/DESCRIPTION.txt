@@ -1,0 +1,1 @@
+Title: ShinyFMBNAuthor: Eugenio ParenteAuthorUrl: http://www.foodmicrobionet.org/License: ExpatDisplayMode: NormalTags: FoodMicrobionet, Amplicon Targeted High Throughput SequencingType: Shiny

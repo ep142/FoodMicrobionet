@@ -20,7 +20,7 @@ This repository will eventually contain the different versions of FoodMicrobione
 
 -  folder **assemble_FMBN** contains the script used for assembling FMBN tables in two R lists, one of which can be used with v2.3 of the ShinyFMBN app and the other containing all fields (a new version of the app compatible with this version will be hopefully made available in February 2022). The Excel files are not provided. Contact me if you are interested. 
 
--  folder **shiny_apps** contains the ShinyFMBN app with the most recent public version. The app makes access to the database easier (although working with custom R scripts is much faster).  
+-  folder **shiny_apps** contains the ShinyFMBN app with the most recent public version and previous versions. The app makes access to the database easier (although working with custom R scripts is much faster). A public beta of the app is also [available on line](https://ep142.shinyapps.io/ShinyFMBN_4_light/). Unfortunately, due to crazy Italian spending regulations I only have a free account on Shinyapps.io... 
 
 -  folder **FMBNanalyzer** contains a script designed to carry out descriptive analysis (bar plots, diversity indices and rarefaction analysis, boxplots, heatmaps, MDS, bipartite analysis) on *agg.RDS files extracted from ShinyFMBN (and saving the results). As of January 2022 I have not had the time to test this script extensively. A RMarkdown document with the script (designed to generate a .html report) is also provided together with a small dataset on seafood.  To use this document you need to:
 
@@ -43,4 +43,4 @@ This repository will eventually contain the different versions of FoodMicrobione
 - folder **miscellaneous** contains miscellaneous scripts used to generate figures and tables in papers related to FoodMicrobionet. While I try to do my best to document what I am doing I don't always have the time to make the scripts fool proof. Read carefully the comments and, if you are reasonably good at programming with R, you should be OK.
 
 __Known issues__
-While BioConductor does supports the arm64 build of R some packages available in GitHub do not (last checked May 2024). Therefore, if you have a Mac with a M1, M2 or M3 processor and want to run this codeyou are better off using the standard version of R.
+While BioConductor does supports the arm64 build of R some packages available in GitHub do not (last checked May 2025, but it may depend on the GNU Fortran you have...). Therefore, if you have a Mac with an ARM64 processor and want to run this code you are better off using the standard version of R.
