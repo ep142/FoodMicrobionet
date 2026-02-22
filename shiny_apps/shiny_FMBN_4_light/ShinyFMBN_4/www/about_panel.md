@@ -2,7 +2,7 @@
 
 FoodMicrobionet is a database of studies on the composition of the bacterial microbiota of food obtained by amplicon targeted (16S RNA gene or 16S RNA for bacteria, ITS1, ITS2 18S RNA gene or 26S RNA gene for fungi) high throughput sequencing.  
 
-Data are organized in tables:  
+Data are organized in [tables](https://github.com/ep142/FoodMicrobionet/blob/master/the_real_thing/FMBN_5_1/FMBN_5_1_2_tablespecs/FMBN5_1_tablespecs_v_1_0.md):  
 
 * __Studies__: metadata on studies  
 
@@ -29,7 +29,9 @@ ShinyFMBN (v4 light) is designed to provide a graphical user interface to:
 
 5. generate and save some summary tables and graphs.  
 
-A stand alone version is available on [Mendeley data](https://dx.doi.org/10.17632/8fwwjpm79y).  
+The stand alone version is available on [Mendeley data](https://dx.doi.org/10.17632/8fwwjpm79y).  
+A manual for the app is available [here](https://github.com/ep142/FoodMicrobionet/blob/master/shiny_apps/shiny_FMBN_4_light/ShinyFMBNManual_v4_gh.md). 
+If you note something strange or wrong please take note of the last action you performed before an error message appeared (generally in red), the error message itself and, if at all possible the day and time of occurrence and create a new issue on [GitHub](https://github.com/ep142/FoodMicrobionet/issue).  
 
 #### Credits and copyright.  
 

@@ -13,14 +13,11 @@
     "data.table",
     "DT",
     "tidyverse",
-    "reshape2",
-    "stringr",
     "lubridate",
     "igraph",
     "magrittr",
     "markdown",
     "randomcoloR",
-    "forcats",
     "zip"
   )
 .bioc_packages <- c(
@@ -529,7 +526,7 @@ ui <- navbarPage(
                        "Menu <taxa agg.> lets you select the taxa aggregation level. ",
                        "Both are affected by your choices in the <Aggregate> tab. ",
                        "Prevalence and abundance filters in the Prev & ab plot tab affect the barplot. ",
-                       "No more than 25 taxa and 25 samples/samples groups are allowed. ",
+                       "No more than 25 taxa and 25 samples/sample groups are allowed. ",
                        style = "font-size:80%"
                      ),
                      p(
@@ -2738,7 +2735,7 @@ server <- function(input, output, session) {
             tgrouping_message <-
               paste("WARNING: too many taxa, grouping by ",
                     taxa_grouping,
-                    " instead!",
+                    " instead! Try changing prevalence and abundance filters in the Prev. & ab. plot tab...",
                     sep = "")
             showNotification(
               tgrouping_message,
