@@ -354,7 +354,9 @@ edges table by the taxonId field.
 3.  **lineage fields**: the order is not used in this version; when the
     information is not available the field is left empty
 
-    1.  **domain**
+    1.  **domain**: note that I am using this because "Bacteria" is technically 
+    a domain and SILVA does not return kingdom; on the other hand it should be 
+    kingdom for fungi
 
     2.  **phylum**
 

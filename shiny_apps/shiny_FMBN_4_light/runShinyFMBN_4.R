@@ -1,4 +1,4 @@
-# runShinyFMBN v 3 ------------------------------------------------------
+# runShinyFMBN v 4_1 ------------------------------------------------------
 
 # This script will:
 # a. check if you have all the packages needed to run ShinyFMBN, 
@@ -25,19 +25,18 @@
   "BiocManager", 
   "phyloseq"
 )
+# I am using pak because it handles dependencies better
+if(!require(pak, quietly = T)) {
+  install.packages("pak")
+  require(pak)
+  }
 .inst <- .cran_packages %in% installed.packages()
 if (any(!.inst)) {
-  install.packages(.cran_packages[!.inst])
+  pak::pkg_install(.cran_packages[!.inst])
 }
 .inst <- .bioc_packages %in% installed.packages()
 if(any(!.inst)) {
-  if(!.inst[1]) {
-    install.packages("BiocManager")
-    .inst <- .bioc_packages %in% installed.packages()
-  }
-  if(any(!.inst[2:length(.inst)])) {
-    BiocManager::install(.bioc_packages[!.inst], ask = F)
-  }
+  pak::pkg_install(.bioc_packages[!.inst])
 }
 sapply(c(.cran_packages, .bioc_packages), require,
        character.only = TRUE)
@@ -45,22 +44,7 @@ sapply(c(.cran_packages, .bioc_packages), require,
 
 runApp("ShinyFMBN_4")
 
-# not run
-# in some cases installation of Bioconductor packages may fail
-# try this
-# installing core bioconductor packages -----------------------------------
-runme <- F
 
-if(runme){
-  if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-  # check R version
-  if (as.numeric(R.version$major) >= 4) {
-    BiocManager::install(version = "3.21")
-  } else {
-    BiocManager::install(version = "3.10")
-  }
-}
 
 # Acknowledgements
 
@@ -74,7 +58,7 @@ if(runme){
 
 # Copyright and license
 
-# Copyright 2024, 2025 Eugenio Parente
+# Copyright 2024, 2025, 2026 Eugenio Parente
 # Permission is hereby granted, free of charge, to any person obtaining 
 # a copy of this software and associated documentation files (the "Software"), 
 # to deal in the Software without restriction, including without limitation 
