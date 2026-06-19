@@ -1,0 +1,12 @@
+name: wimb_app
+title: wimb_app
+username: ep142
+account: ep142
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17485662
+bundleId: 12102986
+url: https://ep142.shinyapps.io/wimb_app/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

@@ -1,0 +1,944 @@
+---
+title: "On the distribution of yeasts of the genus _Mrakia_ in foods"
+author: "E. Parente, DAFE, Università degli Studi della Basilicata"
+date: "2026-06-06"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    df_print: paged
+bibliography: 
+# uncomment the following line and change the name of the project specific bibliography
+#  - My_refs.bib
+# do not change this line
+  - R_citations.bib
+  
+csl: https://raw.githubusercontent.com/citation-style-language/styles/master/apa.csl  
+nocite: |
+  @*
+---
+<!--
+# READ ME  
+This document is built over the where_is_my_bug code available in [FoodMicrobionet repository](https://github.com/ep142/FoodMicrobionet/tree/master/WIMB) and originally used for [this paper](https://www.sciencedirect.com/science/article/abs/pii/S0168160523000405). 
+Code was revised using Claude AI (Sonnet v 4.6)
+The script uses several functions which are sourced from the "source" folder. This is motivated by the fact that I re-use these functions in other script and this way is simpler to keep them up to date.
+The p (parameters) list basically controls what the document can do. Read and change as appropriate before rendering. A few examples:
+
+* if you want to search for a single genus put the genus name in p$taxa_to_search, set p$taxon_level to genus and p$go_down_to to species  
+
+* if you want to search for two or more possibly unrelated taxa put them as a vector (example c("Lactobacillus", "Levilactobacillus") and set p$taxon_level and p$go_down_to to genus: avoid using more than 6-8 genera
+
+* if you want to search for all genera in a family put the family name in p$taxa_to_search, set p$taxon_level to family and p$go_down_to to genus. Note that you might have too many taxa to plot
+
+The other options should be straightforward after you play with them a little bit. In this version I am not going below L1 but, technically, when working with a family, you could select a single genus and do the plots for all L4 levels in which it appears. Of course this can be done in a loop.
+**Note**: this version can work with either bacteria or fungi but not both at the same time: you can control it with p$domain: this must be coherent with p$taxa_to_search: I have not included error trapping for this, may be I will do it in the future.  
+-->
+<!-- 
+## Notes for self (development)
+
+This is a development version. I need to transform it in a .qmd document and make it more general and may be interactive.  
+
+* need to replace phylotools with another package to read fasta files, need to decide the framework I want to use. 
+
+* here I am using "species" for taxa names; to make it more general it should simply be taxon after the pooled_edges_sample_study df is created; which taxon level it is is clear from p$taxon_level
+-->
+
+```{r setup, include=FALSE}
+
+# Install/load packages ---------------------------------------------------
+knitr::opts_chunk$set(echo = FALSE)
+
+
+.cran_packages <- c("tidyverse", "data.table", "bipartite", 
+                    "knitr", "kableExtra")
+
+
+# Fast check for missing packages
+# find.package() is faster than installed.packages() for large libraries
+.is_installed <- function(pkg) {
+  isTRUE(length(find.package(pkg, quiet = TRUE)) > 0)
+}
+
+# Install/load pak
+if(!require("pak", quietly = T)) {
+  install.packages("pak")
+  require(pak)
+}
+
+# Handle CRAN
+.missing_cran <- .cran_packages[!sapply(.cran_packages, .is_installed)]
+if(length(.missing_cran) > 0) {
+  pak::pkg_install(.missing_cran)
+}
+.loaded <- sapply(.all_packages, require, character.only = TRUE)
+if (any(!.loaded)) message("Failed to load: ", paste(names(.loaded)[!.loaded], collapse = ", "))
+
+
+# Install/load functions
+# this script uses several functions which must be available in the source folder
+# if they are not, rendering will stop
+# Directory and file checks
+if (!dir.exists("source")) stop("The 'source' directory does not exist")
+
+needed_functions <- c("get_FMBN.R", "make_distplot.R", "make_dotplot.R", 
+                      "WIMB_utils.R", "update_r_citations.R", 
+                      "get_function_dependencies.R")
+source_functions <- list.files("source")
+
+missing_functions <- setdiff(needed_functions, source_functions)
+
+if (length(missing_functions) > 0) {
+  stop("Missing functions from the source folder: ", paste(missing_functions, collapse = ", "))
+}
+# silently source the files using walk()
+purrr::walk(needed_functions, \(x) source(file.path("source", x)))
+
+# grab user defined functions from the environment
+# This automatically excludes get_function_dependencies and update_r_citations
+# by looking for them specifically or running right after your main scripts are loaded.
+all_user_functions <- lsf.str()
+my_functions <- setdiff(all_user_functions, c("get_function_dependencies", "update_r_citations"))
+packages_in_functions <- get_function_dependencies(my_functions)
+
+all_packages  <- unique(c(packages_in_functions, .cran_packages))
+# generate your completely hands-off .bib bibliography file
+update_r_citations(packages = all_packages, quiet = TRUE)
+
+# Load packages into session, and print package version
+invisible(sapply(all_packages, 
+                 \(x) require(x, character.only = TRUE, quietly = TRUE)))
+
+```
+
+```{r options, message=F, warning= F}
+# technically, it would be safer to recalculate each time because I might run
+# the script from different starting points
+# for reproducibility reasons
+set.seed(100)
+# mainly for reproducibility reasons (this will be saved with the work space)
+r_version <- R.Version() # in the future may be check that the version running is compatible
+# with the script (it only matters if somebody other than myself is using the script)
+session_info <- sessionInfo()
+
+# parameters, as a list
+
+p<- list(
+  # options for opening FoodMicrobionet
+  # the first two are the current location of the latest version of FoodMicrobionet
+  FMBN_repo = "ep142/FoodMicrobionet/",
+  FMBN_path = "29db4568f9dbcbc1ebc39a44b7b538fd708f4950/the_real_thing/FMBN_5_1/FMBN_plus.rds",
+  use_local = TRUE,
+  force_download = FALSE,
+  do_cache = TRUE,
+  # primary output options
+  out_folder = "WIMB_v2", # the output folder
+  verbose = T, # F suppresses part of the output
+  save_data = T, # saves tables and other data
+  save_graph = T, # saves graphs
+  # graph saving
+  graph_type = ".jpeg", # graph device
+  graph_res = 150, #  resolution for saved graphs
+  graph_width = 7, # graph width, inches
+  graph_height = 7, # graph height inches
+  out_fn_pref = "Mrakia_s_", # prefix for saved files
+  # options for taxonomic filtering
+  taxon_level = "genus", # choice is between "order", "family", "genus"
+  go_down_to = "species", # "genus" or "species", but many taxa are not identified at species level
+  keep_NA_lowest = T, # keep taxa which have NA at go_down_to level
+  domain = "Fungi", # Bacteria or Fungi, this is auto-detected by the script
+  taxa_to_search = c("Mrakia"), # the taxa to search, can be a vector
+  # options for removing Chloroplast and/or Mitochondria and and/or poorly identified taxa
+  remove_chloroplast = F,
+  remove_mitochondria = F,
+  remove_no_phylum = T,
+  # sample filters
+  s_type = "Sample", # Sample or Environment or both
+  food_grouping_variable = "L1", # L1 or L4; avoid L6 too narrow
+  min_read_length = 50, # minimum length of sequences (it is an average by study) 
+                        # will be overriden if domain == "Fungi"
+  # a very low value means no filtering
+  run_further_filters = F, # set T to apply additional filters by sequencing target/region
+  gene_targets = c("ITS1", "ITS2", "ITS1-ITS2"), # restrict the gene targets
+  # most frequent values for bacteria are V1-V3, V3-V4 and V4; for fungi ITS1 and ITS2
+  log_base = 10, # log base for relative abundance transformation should be 2 or 10
+    # plot layout and style
+  plot_type = "boxplot",   # "boxplot" or "violin"
+  flip_box_plot = T, # flip the axes in box plots
+  violin_min_n = 10,       # fall back to boxplot if any group has fewer obs
+  plot_facet_by    = "taxon",     # "food": taxon on x, food on facets; "taxon": food on x, taxon on facets
+  plot_fill_var    = "rel_prev", # boxplot fill or point colour: "rel_prev", "spoilage", or "none"
+  plot_show_jitter = TRUE,       # show individual sample points (grey, low alpha)
+  plot_notch       = TRUE,       # notch the boxplot?
+  # dot plot options
+  dotplot_max_taxa      = 10,   # cap on number of taxa shown
+  dotplot_max_foods     = 12,   # cap on number of food categories shown
+  dotplot_size_var      = "median_logab",  # "median_logab" or "median_ab"
+  # options for specialisation and ordination
+  min_n_reads           = 5000, # minimum sequencing depth for specialisation/ordination
+                                # samples below this threshold are excluded from d' and PCoA
+                                # but NOT from prevalence/abundance summaries shown earlier;
+                                # 10000 is a reasonable default for most amplicon studies; lower
+                                # values will help including all F454 studies
+  min_ab_specialisation = 0.001,# minimum relative abundance (proportion) for a taxon x food
+                                # combination to be included in d' and PCoA (0.001 = 0.1%);
+                                # guards against sequencing noise being treated as presence
+  min_prev_specialisation = 3,  # minimum number of samples in which a taxon must appear
+                                # in a food category to be included in d' and PCoA;
+                                # guards against singletons driving the calculation
+  bipartite_weight_var = "rel_prev", # "rel_prev" or "median_ab" but the latter is problematic for several reasons
+  depth_weighted_prev = TRUE,  # if TRUE, weight each presence by min(1, n_reads2/min_n_reads)
+                                # when computing prevalence for d';
+                                # down-weights detections from shallow samples
+  # miscellaneous
+  abbr = 15                     # used to control length of abbreviated taxa and food 
+                                # in graphs
+)
+
+# a manual color scale for T/F
+TF_colors <- c("#F8766D", "#619CFF")
+names(TF_colors) <- c("FALSE", "TRUE")
+```
+
+# What is this report
+
+This is a quick and dirty report on the occurrence and (relative) abundance of `r str_flatten_comma(p$taxa_to_search)` in foods using [FoodMicrobionet version 5.1.2](https://github.com/ep142/FoodMicrobionet). Over time I will transform this in a Quarto document (a dashboard with a simplified workflow is already available).  
+** Please note **: be very careful in not over-interpreting your results. Metataxonomic data are compositional and, when using FoodMicrobionet, you are grouping together several studies in which the absolute total abundance of a given group (bacteria or fungi) may be very different. Additionally, sequencing depth and target genes length are both important issues. Sequencing depth for samples in FoodMicrobionet may range over 3 orders of magnitude (from a few hundreds to >100,000). While in my experience 10,000 sequences are generally more than enough to uncover all the (relevant) diversity in foods, the probability of detecting rare species decreases with decreasing sequencing depths. These issues must be acknowledged and I have provided some options and guards in the parameter list.  
+
+
+Here, I will be loading FMBN directly from GitHub (the last stable version): a cached copy will be stored and refreshed as needed.  
+
+## R packages used in this analysis.  
+
+`r base::version$version.string` [@R-base] was used for this report. I have used packages of the `tidyverse` [@R-tidyverse] and `data.table` [@R-data.table] for data wrangling and plotting. Package `bipartite` [@R-bipartite] was used to calculate specialization indices. Table generation in reports was handled with `knitr` and `kableExtra` [@R-knitr; @R-kableExtra]
+
+## Loading data.  
+
+```{r load-data}
+
+local_input_path <-  NULL
+# set this to NULL if you want a global cache
+#set to file.path("FMBN", "FMBN_plus.rds") if you want a local cache in the project folder
+
+FMBN_plus <- get_FMBN(use_local = p$use_local, force_download = p$force_download,
+    do_cache = p$do_cache, cache_max_days = 180, local_FMBN_path = local_input_path
+    )
+
+# output data folder
+if (!dir.exists(p$out_folder)) dir.create(p$out_folder)
+```
+`r FMBN_plus$version`.
+I will focus on the `r p$taxon_level` level in this example and will go down to `r p$go_down_to`: technically, it would be better to include two or more genera which share the same niches, for comparison purposes.
+
+```{r get-data, message = F, warning = F}
+
+# collapse vector to a single label for use in text and captions
+taxon_label <- str_c(p$taxa_to_search, collapse = ", ")
+
+# check number of taxa requested
+if (length(p$taxa_to_search) > 12) {
+  warning("More than 12 taxa requested. Plots may be unreadable. ",
+          "Consider reducing taxa_to_search to 12 or fewer.", call. = FALSE)
+}
+
+match_tax_level <- p$taxon_level %in% colnames(FMBN_plus$taxa)[3:8]
+match_go_down   <- p$go_down_to  %in% colnames(FMBN_plus$taxa)[3:9]
+
+if (!(match_tax_level & match_go_down)) cat(
+  "\nWARNING: wrong taxonomic level(s)! Must be one of:\n",
+  colnames(FMBN_plus$taxa)[3:9], "\n"
+)
+
+# match_go_down must be a taxonomic level below taxon_level
+right_tax_order <- which(p$go_down_to   == colnames(FMBN_plus$taxa))[[1]] >
+                   which(p$taxon_level  == colnames(FMBN_plus$taxa))[[1]]
+
+# --- auto-detect domain from taxa_to_search --------------------------------
+# look up each taxon in p$taxa_to_search across ALL taxa (both domains)
+taxa <- FMBN_plus$taxa
+
+detected_domains <- auto_detect_domain(taxon_to_search = p$taxa_to_search,
+                                       taxon_level = p$taxon_level, 
+                                       taxa_all = taxa)
+# set domain automatically — overrides p$domain if present
+if(detected_domains != p$domain) p$domain <- detected_domains
+
+if (p$verbose) message("Domain auto-detected as: ", p$domain)
+
+# --- taxonomic filtering ----------------------------------------------------
+
+my_taxa <- taxa |>
+  dplyr::filter(domain == p$domain)
+
+unique_taxa <- unique(my_taxa[[p$taxon_level]])
+unique_taxa <- unique_taxa[!is.na(unique_taxa)]
+
+# %chin% is provided by data.table and is faster than %in% for character vectors
+is_valid_taxon <- any(p$taxa_to_search %chin% unique_taxa)
+
+my_taxa_in_FMBN <- my_taxa_in_FMBN <- unique_taxa[unique_taxa %chin% p$taxa_to_search]
+
+is_valid_taxon <- all(my_taxa_in_FMBN %chin% unique_taxa)
+if (!is_valid_taxon) stop(paste("\nWARNING: can't find your taxon in", p$taxon_level, "\n"))
+
+if (length(p$taxa_to_search) == 1) {
+  my_taxa <- dplyr::filter(my_taxa, .data[[p$taxon_level]] == p$taxa_to_search)
+} else {
+  my_taxa <- dplyr::filter(my_taxa, .data[[p$taxon_level]] %in% p$taxa_to_search)
+}
+
+# counts of taxa at taxon_level
+taxa_count <- my_taxa |> dplyr::count(.data[[p$taxon_level]])
+
+# optionally remove NA in the level immediately below taxon_level
+tax_level_below <- case_when(
+  p$taxon_level == "order"  ~ "family",
+  p$taxon_level == "family" ~ "genus",
+  p$taxon_level == "genus"  ~ "species"
+)
+
+my_taxa_all <- my_taxa
+
+if (!p$keep_NA_lowest) my_taxa <- dplyr::filter(
+  my_taxa, !is.na(.data[[tax_level_below]])
+)
+
+# --- edges ------------------------------------------------------------------
+if (p$domain == "Bacteria") {
+  edges <- FMBN_plus$edges_B
+} else {
+  edges <- FMBN_plus$edges_F
+}
+
+if (p$remove_chloroplast & p$domain == "Bacteria") {
+  chloroplast_id <- FMBN_plus$taxa |>
+    dplyr::filter(label == "Chloroplast" | class == "Chloroplast") |>
+    pull(taxonId)
+  edges <- dplyr::filter(edges, !(taxonId %in% chloroplast_id))
+}
+
+if (p$remove_mitochondria & p$domain == "Bacteria") {
+  mitochondria_id <- FMBN_plus$taxa |>
+    dplyr::filter(label == "Mitochondria" | family == "Mitochondria") |>
+    pull(taxonId)
+  edges <- edges |> dplyr::filter(!(taxonId %in% mitochondria_id))
+}
+
+if (p$remove_no_phylum) {
+  no_phylum_id <- taxa |> dplyr::filter(is.na(phylum)) |> pull(taxonId)
+  edges <- edges |> dplyr::filter(!(taxonId %in% no_phylum_id))
+}
+
+# re-calculate weight if any taxa were removed
+if (any(p$remove_chloroplast, p$remove_mitochondria, p$remove_no_phylum)) {
+  edges <- edges |>
+    mutate(weight_old = weight) |>
+    group_by(sampleId) |>
+    mutate(weight = weight / sum(weight)) |>
+    ungroup()
+}
+
+# note: weight is now a fraction; weight_old is the uncorrected value
+
+n_edges <- nrow(edges)
+# filtering join: keep only edges for taxa of interest
+edges_filt <- semi_join(edges, my_taxa, by = "taxonId")
+
+prop_edges_my_taxa <- nrow(edges_filt) / n_edges
+
+# join taxonomy
+edges_filt <- left_join(edges_filt,
+                        select(my_taxa, taxonId:species),
+                        by = "taxonId")
+
+# --- handle NA at go_down_to level ------------------------------------------
+tax_levels <- c("domain", "phylum", "class", "order", "family", "genus", "species")
+target_level <- p$go_down_to
+target_idx   <- match(target_level, tax_levels)
+
+if (target_idx > 1) {
+  parent_level <- tax_levels[target_idx - 1]
+  edges_filt <- edges_filt |>
+    mutate(!!sym(target_level) := case_when(
+      !is.na(!!sym(target_level))  ~ !!sym(target_level),
+      target_level == "species"    ~ str_c(!!sym(parent_level), " spp."),
+      TRUE                         ~ !!sym(parent_level)
+    ))
+}
+
+# --- pool edges by sample x go_down_to --------------------------------------
+pooled_edges <- edges_filt |>
+  group_by(sampleId, .data[[p$go_down_to]]) |>
+  summarise(weight = sum(weight), .groups = "drop") |>
+  arrange(sampleId, .data[[p$go_down_to]])
+
+# --- samples ----------------------------------------------------------------
+if (p$domain == "Bacteria") {
+  filt_samples <- FMBN_plus$samples_B
+} else {
+  filt_samples <- FMBN_plus$samples_F
+}
+
+# remove blanks, mocks, and water samples
+filt_samples <- filt_samples |>
+  dplyr::filter(
+    !str_detect(L1, "blank") &
+    !str_detect(L1, "Mock")  &
+    !str_detect(L1, "^Water")
+  )
+
+if (p$s_type %in% c("Environment", "Sample")) {
+  filt_samples <- filt_samples |> dplyr::filter(s_type == p$s_type)
+}
+
+food_cat_all <- filt_samples |>
+  distinct(.data[[p$food_grouping_variable]])
+
+# inner join: also acts as a filtering join removing unwanted samples
+pooled_edges_sample <- inner_join(
+  pooled_edges,
+  select(filt_samples, studyId, sampleId, s_type, n_reads2, n_issues,
+         foodId, L1:target2, geo_loc_country),
+  by = "sampleId"
+)
+
+food_cat_w_taxa <- pooled_edges_sample |> 
+  distinct(.data[[p$food_grouping_variable]]) 
+
+# --- studies ----------------------------------------------------------------
+filt_studies <- FMBN_plus$studies
+
+# join study info
+pooled_edges_sample_study <- inner_join(
+  pooled_edges_sample,
+  select(filt_studies, studyId, read_length_bp, Seq_accn,
+         food_group, overlapping, paired_end),
+  by = "studyId"
+)
+
+food_cats_message <- setdiff(food_cat_all[[p$food_grouping_variable]], 
+                             food_cat_w_taxa[[p$food_grouping_variable]])
+if(length(food_cats_message)>0) {
+  food_cats_message <- str_c("The food categories in which the taxa are NOT found are: ",
+                           str_flatten_comma(food_cats_message),".", sep ="")
+} else {
+    food_cats_message <- ""
+  }
+
+# summary counts for in-line text
+nstudies_wtarget <- pooled_edges_sample_study |> distinct(studyId) |> nrow()
+nsamples_wtarget <- pooled_edges_sample_study |> distinct(sampleId) |> nrow()
+nstudies_total   <- nrow(FMBN_plus$studies)
+nsamples_total   <- if (p$domain == "Bacteria") {
+  nrow(FMBN_plus$samples_B)
+} else {
+  nrow(FMBN_plus$samples_F)
+}
+
+```
+
+
+`r nstudies_wtarget` studies include `r taxon_label` out of `r nstudies_total`. `r taxon_label` is found in `r nsamples_wtarget` samples out of `r nsamples_total`. The taxa were found in `r nrow(food_cat_all)` out of `r nrow(food_cat_w_taxa)`. `r food_cats_message`
+  
+
+
+## Where are my taxa?
+
+I am now creating a table with the number of samples by food category which contain the taxon of interest. Note that, in order to calculate prevalence, I need a denominator. This really depends on the level of aggregation. Additionally, it would be better to perform some sort of sample equalization by group. Here, I will use a simplified approach and get the denominator I will use the following procedure:  
+
+* select samples for the food group variable selected in parameters in which the target taxon/taxa is/are present; 
+
+* get the total number of samples for each group 
+
+* if the grouping variable is L1, get the L4 groups in which the target taxon/taxa are found; get the total number of samples for each group  
+
+* further filtering by target and sequencing depth is optionally applied
+
+
+```{r tbl-prevab_1, warning = F}
+
+# remove any NA deriving from the left_join of samples
+pooled_edges_sample_study <- pooled_edges_sample_study |>
+  dplyr::filter(!is.na(.data[[p$food_grouping_variable]]))
+
+# remove samples below minimum sequencing depth
+# done here so all downstream outputs (prevalence, abundance, plots,
+# specialisation) are consistent with each other
+n_before_depth <- n_distinct(pooled_edges_sample_study$sampleId)
+pooled_edges_sample_study <- pooled_edges_sample_study |>
+  dplyr::filter(n_reads2 >= p$min_n_reads)
+n_after_depth <- n_distinct(pooled_edges_sample_study$sampleId)
+
+if (p$verbose) message(
+  n_before_depth - n_after_depth, " samples removed (n_reads2 < ", p$min_n_reads, "); ",
+  n_after_depth, " retained."
+)
+
+pooled_edges_sample_study_all <- pooled_edges_sample_study
+
+if (p$run_further_filters) {
+  pooled_edges_sample_study <- pooled_edges_sample_study |>
+    dplyr::filter(target2 %in% p$gene_targets)
+}
+
+n_samples <- filt_samples |>
+  dplyr::filter(sampleId %in% unique(pooled_edges_sample_study$sampleId)) |>
+  summarise(n = n_distinct(sampleId), .by = all_of(p$food_grouping_variable))
+
+# join original info and look at proportions
+n_samples_all <- filt_samples |>
+  dplyr::filter(s_type == p$s_type) |>
+  summarise(n = n_distinct(sampleId), .by = all_of(p$food_grouping_variable)) |>
+  dplyr::rename(n_all = n)
+
+n_samples <- left_join(n_samples, n_samples_all, by = p$food_grouping_variable) |>
+  mutate(prev = n / n_all) |>
+  dplyr::arrange(desc(prev))
+
+if (p$food_grouping_variable == "L1") {
+  n_samples_all_L4 <- filt_samples |>
+    dplyr::filter(s_type == "Sample") |>
+    summarise(n = n_distinct(sampleId), .by = "L4") |>
+    dplyr::rename(n_all = n)
+}
+
+
+if (p$save_data) {
+  out_fn <- file.path(p$out_folder, str_c(p$out_fn_pref, "n_samples_table.txt"))
+  write_tsv(n_samples, file = out_fn)
+}
+
+n_samples |>
+  kable(caption = str_c("Number of samples in which ", taxon_label, " is found after filtering steps."),
+        digits = 2) |>
+  kable_classic()
+```
+Here is a table with studies and references.
+
+```{r tbl-study-refs}
+# get study info and references 
+my_studies <- distinct(pooled_edges_sample_study, studyId) |>
+  pull(studyId)
+my_studies_df <- filt_studies |>
+  dplyr::filter(studyId %in% my_studies) |>
+  select(studyId, target, region, bioproject, food_group, DOI, ref_complete)
+if (p$save_data) {
+  write_tsv(my_studies_df, file.path(p$out_folder, str_c(p$out_fn_pref, "studies.txt")))
+}
+kable(my_studies_df, caption = str_c(
+  "Details on FoodMicrobionet studies in which ",
+  taxon_label, " are found."
+)) |>
+  kable_styling() |>
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Calculate prevalence and abundance.  
+
+I will now calculate prevalence and abundance. More options (including more indices, see the filter_and_profile taxa function) should be added in the future.
+
+```{r tbl-prevab-2}
+# calculate prevalence and abundance 
+
+prev_df <- pooled_edges_sample_study |>
+  group_by(across(all_of(c(p$go_down_to, p$food_grouping_variable)))) |>
+  summarise(abs_prev = n_distinct(sampleId),
+            .groups = "drop_last") |>
+  ungroup() |>
+  left_join(n_samples, by = p$food_grouping_variable) |>
+  mutate(prev = abs_prev/n_all)
+# by default there are no 0 weight in FoodMicrobionet, they only become 0 if you pivot_wider the edges
+# I could use an option for using log(abundance) and/or for choosing the base of the log (2 or 10) 
+
+ab_df <- pooled_edges_sample_study |>
+  mutate(log_ab = log(weight, base = p$log_base)) |>
+  group_by(across(all_of(c(p$go_down_to, p$food_grouping_variable)))) |>
+  summarise(min_ab = min(weight),
+            max_ab = max(weight),
+            mean_ab = mean(weight),
+            median_ab = median(weight),
+            mad_ab = mad(weight),
+            median_logab = median(log_ab),
+            .groups = "drop_last") |>
+  ungroup()
+
+prev_ab_df <- left_join(prev_df, ab_df, by = c(p$go_down_to, p$food_grouping_variable)) |>
+  dplyr::arrange(p$go_down_to, p$food_grouping_variable)
+
+if (p$save_data) {
+  write_tsv(prev_ab_df, file.path(p$out_folder, str_c(p$out_fn_pref, "prev_ab_df.txt")))
+}
+
+kable(prev_ab_df, "html",
+      caption = str_c(
+        "Prevalence and abundance summary for ",
+        taxon_label, "."
+      ), digits = 3) |>
+  kable_styling() |>
+  scroll_box(width = "100%", height = "300px")
+
+  
+```
+
+## Plotting the distributions.  
+
+Here is a diagnostic plot on sequence length (shorter sequences can be optionally removed).
+
+```{r fig-seq-length-plot, message = F, warning = F}
+ggplot(pooled_edges_sample_study, mapping = aes(x=read_length_bp)) +
+  facet_wrap(~target2) +
+  geom_histogram()
+
+# removing shorter sequences (only ifp$domain == "Bacteria)
+if(p$domain == "Bacteria"){
+  pooled_edges_sample_study <- pooled_edges_sample_study |>
+    dplyr::filter(read_length_bp >= p$min_read_length)
+  }
+
+# how many studies left?
+residual_studies <- unique(pooled_edges_sample_study$studyId)
+# how many samples left?
+residual_samples <- unique(pooled_edges_sample_study$sampleId)
+
+# recalculate prev and ab
+prev_df_sel <- pooled_edges_sample_study |>
+  group_by(across(all_of(c(p$go_down_to, p$food_grouping_variable)))) |>
+  summarise(abs_prev = n_distinct(sampleId),
+            .groups = "drop_last") |>
+  ungroup() |>
+  left_join(n_samples, by = p$food_grouping_variable) |>
+  mutate(prev = abs_prev/n_all)
+
+# by default there are no 0 weight in FoodMicrobionet, they only become 0 if you pivot_wider the edges
+# I could use an option for using log(abundance) and/or for choosing the base of the log (2 or 10) 
+
+ab_df_sel <- pooled_edges_sample_study |>
+  mutate(log_ab = log(weight, base = p$log_base)) |>
+  group_by(across(all_of(c(p$go_down_to, p$food_grouping_variable)))) |>
+  summarise(min_ab = min(weight),
+            max_ab = max(weight),
+            mean_ab = mean(weight),
+            median_ab = median(weight),
+            mad_ab = mad(weight),
+            median_logab = median(log_ab),
+            .groups = "drop_last") |>
+  ungroup()
+
+
+prev_ab_df_sel <- left_join(prev_df_sel, ab_df_sel, 
+                            by = c(p$go_down_to, p$food_grouping_variable)) |>
+  dplyr::arrange(p$go_down_to, p$food_grouping_variable)
+
+if (p$save_data) {
+  write_tsv(prev_ab_df_sel, file.path(p$out_folder, str_c(p$out_fn_pref, "prev_ab_df_sel.txt")))
+}
+
+```
+
+After further filtering, there are `r length(residual_studies)` studies and `r length(residual_samples)` samples left.  
+
+
+# Visualisations for prevalence and abundance.
+
+I am using variations of box plots / violin plots and dotplots for abundance with colour clues for prevalence. Highlighting fermented and/or spoiled samples is also possible.
+
+## Abbreviations for foods and taxa.  
+
+```{r tbl-taxa-abbreviations}
+# create abbreviations
+# resolve_abbr, in lieu of str_trunc ensures that each abbreviation is unique
+# need to use %>% as a pipe
+df_to_plot <- pooled_edges_sample_study %>% 
+  mutate(taxon_abbr = resolve_abbr(vals = .data[[p$go_down_to]], 
+                                   width = p$abbr)$abbr,
+         food_group_abbr = resolve_abbr(vals = .data[[p$food_grouping_variable]], 
+                                     width = p$abbr)$abbr,
+         log_ab = log(weight, base = p$log_base)) 
+
+# I am transforming species into an ordered factor, to make plotting more 
+# coherent with phylogenetic relatedness. 
+# you may choose alternative sorting approaches here
+species_levels <- sort(unique(pooled_edges_sample_study[[p$go_down_to]]))
+taxa_abbr_levels <- sort(unique(df_to_plot$taxon_abbr))
+
+
+df_to_plot <- df_to_plot |>
+  mutate(taxon_abbr = factor(taxon_abbr, levels = taxa_abbr_levels),
+         !!sym(p$go_down_to) := factor(.data[[p$go_down_to]], levels = species_levels))
+# left join the prevalence data, by food group and taxon
+df_to_plot <- df_to_plot |> 
+  left_join(select(prev_ab_df_sel, all_of(c(p$go_down_to, p$food_grouping_variable)), rel_prev = prev))  
+  
+# the ordering of the factors could be adjusted
+keys_taxa <- df_to_plot |> distinct(.data[[p$go_down_to]], taxon_abbr)
+keys_taxa |> kable(caption = "Abbreviations for taxa names in plots.") |>
+  kable_classic()
+```
+
+
+```{r tbl-food-abbreviations}
+keys_foods <- df_to_plot |> distinct(.data[[p$food_grouping_variable]], food_group_abbr)
+keys_foods |> kable(caption = "Abbreviations for food categories in plots") |>
+  kable_classic()
+```
+
+## The distribution plot, finally.
+
+The plot layout and style are controlled by several parameters in `p`:
+
+* `plot_type` can be "boxplot" or "violin"  
+
+* `violin_min_n` fall back to boxplot if any group has fewer obs
+
+* `plot_facet_by`: `"food"` puts taxa on the x-axis and food categories on facets; `"taxon"` flips this.
+* `plot_fill_var`: `"rel_prev"` maps relative prevalence (a group-level summary) to the box fill (continuous viridis); `"spoilage"` maps the fermentation/spoilage status (a sample-level property) to the colour of the jitter points; `"none"` leaves both plain.
+* `plot_show_jitter`: if `TRUE`, individual samples are shown as grey points behind the boxes (outlier markers are automatically suppressed to avoid double-plotting).
+* `plot_notch`: whether to notch the boxes.
+
+```{r fig-boxplot, fig.height = 7, warning = FALSE, message = FALSE}
+
+# override the colours defined in make_dist_plot if you want
+override_make_dist_plot <- F # set this to T to change
+if(override_make_dist_plot){
+  fermspoil_scale_1 <- c("blue", "red", "cyan", "mediumorchid")
+  # alternatives to consider:
+  # High contrast, universally accessible
+  fermspoil_scale_2 <- c("#E69F00", "#56B4E9", "#009E73", "#CC79A7")
+  # Punchy and highly differentiable
+  fermspoil_scale_3 <- c("#648FFF", "#785EF0", "#DC267F", "#FE6100") 
+  # (Blue, Violet, Magenta, Orange)
+  # (Orange, Sky Blue, Bluish Green, Reddish Purple)
+  # Evenly spaced across the Viridis spectrum
+  fermspoil_scale_4 <- c("#440154", "#31688E", "#35B779", "#FDE725") 
+  # (Deep Purple, Muted Blue, Vibrant Green, Bright Yellow)
+  fermspoil_scale <- fermspoil_scale_2# set this to change the palette
+  names(fermspoil_scale) <- c("Unspoiled", "Spoiled", "Fermented", "Fermented+Spoiled")
+}
+
+weightlabel <- if_else(p$log_base == 2,
+                       "log2(rel. abundance)",
+                       "log10(rel. abundance)")
+
+box_plot_out <- make_distplot(df_to_plot, p, weightlabel)
+box_plot_out
+
+if (p$save_graph) {
+  out_fn <- file.path(p$out_folder, str_c(p$out_fn_pref, "prev_ab_boxplot", p$graph_type))
+  ggsave(box_plot_out, filename = out_fn, dpi = p$graph_res, width = p$graph_width,
+         height = p$graph_height)
+}
+```
+
+
+### Dot plot: median abundance × prevalence.
+
+```{r fig-dotplot, fig.height = 7, warning = FALSE, message = FALSE}
+
+dot_plot_out <- make_dotplot(prev_ab_df_sel, p, weightlabel)
+dot_plot_out
+
+if (p$save_graph) {
+  out_fn <- file.path(p$out_folder, str_c(p$out_fn_pref, "dotplot", p$graph_type))
+  ggsave(dot_plot_out, filename = out_fn, dpi = p$graph_res, width = p$graph_width,
+         height = p$graph_height)
+}
+```
+
+# Specialisation.
+
+This section characterises the degree of food-category specialisation of each taxon using
+the d' index from the `bipartite` package. Note that the analyses in this
+section apply additional filtering (see parameters `min_ab_specialisation` and
+`min_prev_specialisation`) on top of the depth filter already applied to
+`pooled_edges_sample_study`. Results here are therefore based on a subset of the data
+and should be interpreted accordingly. The additional filtering removes taxon x food
+category combinations supported by very few samples or very low abundance, which would
+produce unreliable specialisation estimates.
+
+## Diagnostic: sequencing depth by food category
+
+This table summarises sequencing depth of the retained samples by food category. Food
+categories with high `pct_below_threshold` had many shallow samples removed by the
+depth filter and their prevalence and specialisation estimates should be interpreted
+with caution.
+
+```{r tbl-depth-diagnostics, warning = FALSE, message = FALSE}
+
+depth_diag <- pooled_edges_sample_study |>
+  distinct(sampleId, .data[[p$food_grouping_variable]], n_reads2) |>
+  group_by(.data[[p$food_grouping_variable]]) |>
+  summarise(
+    n_samples           = n(),
+    median_depth        = median(n_reads2, na.rm = TRUE),
+    min_depth           = min(n_reads2,    na.rm = TRUE),
+    max_depth           = max(n_reads2,    na.rm = TRUE),
+    pct_below_threshold = mean(n_reads2 < p$min_n_reads, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(median_depth)
+
+if (p$verbose) {
+  n_shallow_cats <- sum(depth_diag$pct_below_threshold > 0.5)
+  if (n_shallow_cats > 0)
+    message(n_shallow_cats, " food category/ies have >50% of samples below the ",
+            p$min_n_reads, " read threshold — interpret d' for these with caution.")
+}
+
+depth_diag |>
+  kable(caption = str_c(
+    "Sequencing depth by ", p$food_grouping_variable,
+    " after depth filtering (min_n_reads = ", p$min_n_reads, "). ",
+    "pct_below_threshold: proportion of samples originally below threshold ",
+    "(shown for reference only — those samples are already excluded)."
+  ), digits = 3) |>
+  kable_classic() |>
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Build the interaction matrix for specialisation
+
+```{r tbl-specialisation-filter, warning = FALSE, message = FALSE}
+
+# step 1: compute depth-weighted or standard prevalence and median abundance
+# per taxon x food category combination
+# note: depth filtering is already applied to pooled_edges_sample_study
+spec_summary <- pooled_edges_sample_study |>
+  group_by(.data[[p$go_down_to]], .data[[p$food_grouping_variable]]) |>
+  summarise(
+    abs_prev      = if (p$depth_weighted_prev) {
+      sum(pmin(1, n_reads2 / p$min_n_reads), na.rm = TRUE)
+    } else {
+      n_distinct(sampleId)
+    },
+    n_samples_grp = n_distinct(sampleId),
+    median_ab     = median(weight,                  na.rm = TRUE),
+    median_logab  = median(log(weight, p$log_base), na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  left_join(
+    dplyr::select(n_samples, all_of(p$food_grouping_variable), n_all),
+    by = p$food_grouping_variable
+  ) |>
+  mutate(rel_prev = abs_prev / n_all)
+
+# step 2: apply abundance and prevalence thresholds
+spec_summary_filt <- spec_summary |>
+  dplyr::filter(
+    median_ab     >= p$min_ab_specialisation,
+    n_samples_grp >= p$min_prev_specialisation
+  )
+
+n_combos_before <- nrow(spec_summary)
+n_combos_after  <- nrow(spec_summary_filt)
+
+if (p$verbose) message(
+  n_combos_before - n_combos_after, " taxon x food combinations dropped by ",
+  "abundance/prevalence thresholds; ", n_combos_after, " retained."
+)
+
+# step 3: pivot to wide interaction matrix
+# rows = taxa, columns = food categories
+# weight is either rel_prev or median_ab — log-abundance is not used here
+# because d' marginals require weights with a proportional interpretation
+weight_var <- p$bipartite_weight_var  # "rel_prev" or "median_ab"
+
+interact_matrix <- spec_summary_filt |>
+  dplyr::select(all_of(c(p$go_down_to, p$food_grouping_variable, weight_var))) |>
+  pivot_wider(
+    names_from  = all_of(p$food_grouping_variable),
+    values_from = all_of(weight_var),
+    values_fill = 0
+  ) |>
+  column_to_rownames(p$go_down_to)
+
+if (p$verbose) message(
+  "Interaction matrix: ", nrow(interact_matrix), " taxa x ",
+  ncol(interact_matrix), " food categories. ",
+  "Weight variable: ", weight_var, "."
+)
+
+interact_matrix |>
+  round(3) |>
+  kable(caption = str_c(
+    "Interaction matrix used for specialisation analysis. ",
+    "Weight variable: ", weight_var, ". ",
+    "Zeros indicate taxon x food combinations excluded by filtering."
+  )) |>
+  kable_classic() |>
+  scroll_box(width = "100%", height = "300px")
+```
+
+## Specialisation index d'
+
+d' measures how much each taxon concentrates its interactions on a subset of food
+categories relative to what would be expected from the marginal distributions of the
+network. d' = 0 indicates a perfect generalist (taxon uses all food categories in
+proportion to their overall availability); d' = 1 indicates a perfect specialist.
+Values should be interpreted cautiously for taxa present in few food categories or
+for food categories with high depth heterogeneity (see diagnostic table above). 
+Note however that FoodMicrobionet is not a random sampling of foods: some foods 
+may be over represented and other under-represented. Also, the foods that are 
+included depend from the ensemble of taxa you have selected: The more taxa you use 
+the likelier it is that you include a wide variety of foods and that the specialisation.  
+indices are meaningful.  
+
+```{r tbl-specialisation-dprime, warning = FALSE, message = FALSE}
+
+spec_result <- bipartite::specieslevel(
+  t(interact_matrix),
+  level = "higher",  # taxa are rows = higher trophic level in bipartite terminology
+  index = "d"
+)
+
+dprime_df <- spec_result |>
+  as_tibble(rownames = p$go_down_to) |>
+  rename(d_prime = d) |>
+  arrange(desc(d_prime))
+
+if (p$verbose) message(
+  "d' computed for ", nrow(dprime_df), " taxa across ",
+  ncol(interact_matrix), " food categories."
+)
+
+# identify taxa dropped from d' due to insufficient data
+taxa_in_data   <- unique(pooled_edges_sample_study[[p$go_down_to]])
+taxa_in_dprime <- dprime_df[[p$go_down_to]]
+taxa_dropped_dprime <- setdiff(taxa_in_data, taxa_in_dprime)
+
+d_prime_message <- if(length(taxa_dropped_dprime) > 0) str_c("The following taxa were excluded because they did not meet the minimum abundance (", p$min_ab_specialisation, ") or prevalence (", p$min_prev_specialisation, " samples) thresholds in any food category: ", str_flatten_comma(taxa_dropped_dprime), ".") else "All taxa met the thresholds for d' calculation."
+
+dprime_df |>
+  kable(caption = str_c(
+    "Specialisation index d' for ", taxon_label, ". ",
+    "d' = 0: perfect generalist; d' = 1: perfect specialist. ",
+    "Weight variable used: ", weight_var, "."
+  ), digits = 3) |>
+  kable_classic()
+```
+
+d' was computed for `r nrow(dprime_df)` out of `r length(unique(pooled_edges_sample_study[[p$go_down_to]]))` taxa.
+`r d_prime_message`
+
+# Conclusions.  
+
+These are mostly up to you, the user of this script. Consider carefully what you want to use: one taxon? Two or more? At which taxonomic resolution?
+
+# Acknowledements.  
+
+Claude AI (Sonnet 4.6) was used to 
+
+1. suggest the initial version of the dot plot and bipartite analysis which were then revised by me and polished by Claude in a second pass  
+
+2. more generally, to revise the code
+
+
+# Copyright. 
+
+This is version 1.2.5 (2026-06-06).
+
+Assume that this is overall under MIT licence.
+
+Copyright 2026 Eugenio Parente.  
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# References.  

@@ -38,7 +38,13 @@ This repository will eventually contain the different versions of FoodMicrobione
 
 - folder **the_real_thing** contains the database in two formats: R lists and Excel files (each in their own folders). Both are safer to use than text files for which occasional problems with accented letters and special characters occur in different locales. As a bonus, I am including in the folder with the R lists a .Rmd document designed to provide a statistical report on the current version of FMBN and a script (ide_depth.R) which can be used to produce graphs on the depth of taxonomic assignments in FMBN studies. Both version 4.1 and version 4.2 are provided.  
 
-- folder **WIMB** (Where is my bug?) contains example scripts and data used in our [paper on the ecological distribution of *Lactobacillaceae*](https://doi.org/10.1016/j.ijfoodmicro.2023.110124).
+- folder **WIMB** (Where is my bug?) contains utilities for evaluationg the distirbution of microorganisms in foods using FoodMicrobionet; there sare available in three folders:
+
+  + **WIMB_Lacto**: (legacy) example scripts and data used in our [paper on the ecological distribution of *Lactobacillaceae*](https://doi.org/10.1016/j.ijfoodmicro.2023.110124).
+  
+  + **WIMB_app_folder**: the [WIMB Shiny app](https://ep142.shinyapps.io/WIMB_app/) and related resources  
+  
+  + **WIMB_folder**: contains a RMarkdown document which significantly expands capabilities of the app (and related resources)
 
 - folder **miscellaneous** contains miscellaneous scripts used to generate figures and tables in papers related to FoodMicrobionet. While I try to do my best to document what I am doing I don't always have the time to make the scripts fool proof. Read carefully the comments and, if you are reasonably good at programming with R, you should be OK.
 
