@@ -1,7 +1,7 @@
 ---
 title: "On the distribution of yeasts of the genus _Mrakia_ in foods"
 author: "E. Parente, DAFE, Università degli Studi della Basilicata"
-date: "2026-06-06"
+date: "2026-06-24"
 output:
   html_document:
     toc: yes
@@ -70,9 +70,6 @@ if(!require("pak", quietly = T)) {
 if(length(.missing_cran) > 0) {
   pak::pkg_install(.missing_cran)
 }
-.loaded <- sapply(.all_packages, require, character.only = TRUE)
-if (any(!.loaded)) message("Failed to load: ", paste(names(.loaded)[!.loaded], collapse = ", "))
-
 
 # Install/load functions
 # this script uses several functions which must be available in the source folder
@@ -100,6 +97,8 @@ all_user_functions <- lsf.str()
 my_functions <- setdiff(all_user_functions, c("get_function_dependencies", "update_r_citations"))
 packages_in_functions <- get_function_dependencies(my_functions)
 
+
+# get all packages
 all_packages  <- unique(c(packages_in_functions, .cran_packages))
 # generate your completely hands-off .bib bibliography file
 update_r_citations(packages = all_packages, quiet = TRUE)
@@ -933,7 +932,7 @@ Claude AI (Sonnet 4.6) was used to
 
 # Copyright. 
 
-This is version 1.2.5 (2026-06-06).
+This is version 1.2.6 (2026-06-24).
 
 Assume that this is overall under MIT licence.
 
