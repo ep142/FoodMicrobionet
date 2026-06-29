@@ -43,6 +43,6 @@ scientific papers related to FoodMicrobionet
 5.  **run_ShinyFMBN_from_GitHub** downloads and run ShinyFMBN from GitHub. 
 **be patient** it might require package installation in your system  
 
-6.  **network_analysis_v2.ipynb** is a Jupyter notebook which allows you to install 
+6.  **network_analysis_v2.1.ipynb** is a Jupyter notebook which allows you to install 
 packages needed for microbial association network analysis inference and analysis 
-with NetCoMi [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ep142/FoodMicrobionet/blob/master/miscellaneous/network_analysis_v2.ipynb)
+with NetCoMi [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ep142/FoodMicrobionet/blob/master/miscellaneous/network_analysis_v2_1.ipynb)
