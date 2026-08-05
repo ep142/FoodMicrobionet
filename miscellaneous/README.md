@@ -46,3 +46,5 @@ scientific papers related to FoodMicrobionet
 6.  **network_analysis_v2.1.ipynb** is a Jupyter notebook which allows you to install 
 packages needed for microbial association network analysis inference and analysis 
 with NetCoMi [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ep142/FoodMicrobionet/blob/master/miscellaneous/network_analysis_v2_1.ipynb)
+
+7.  **get_FMBN** is a small service function which allows you to download the most recent version of FMBN from GitHub and optionally cache it locally (with options to save it in a common, shared location)
